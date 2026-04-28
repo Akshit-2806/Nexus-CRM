@@ -203,10 +203,7 @@ const Modal=({title,onClose,onSave,saveLabel="Save",wide=false,xl=false,noFooter
     </div>
   </div>
 );
-Of course! Let's do this step by step, very simply.
-Step 1 — Open your App.js file and use Ctrl+F (or Cmd+F on Mac) to search for this exact text:
 // ─── LOGIN
-Step 2 — Just above that line, paste this entire block:
 jsconst AddLeadWizard = ({ nLead, setNL, onClose, onSave, users, isAdmin }) => {
   const [step, setStep] = useState(1);
   const steps = ["Contact Info","Deal Details","Services & Notes"];
