@@ -1,103 +1,4 @@
 
-// ── AddLeadWizard — defined OUTSIDE App so it never remounts on parent re-render
-const AddLeadWizard = ({ nLead, setNL, onClose, onSave, users, isAdmin }) => {
-  const [step, setStep] = useState(1);
-  const steps = ["Contact Info","Deal Details","Services & Notes"];
-  const valid1 = nLead.name && nLead.company;
-  const valid2 = nLead.value && nLead.salesPersonId;
-  return (
-    <Modal title="Add New Lead" onClose={onClose} onSave={step===3?onSave:()=>setStep(s=>s+1)} saveLabel={step===3?"Save Lead":"Next →"} xl noFooter>
-      <div className="flex items-center gap-0 mb-6 -mt-2">
-        {steps.map((s,i)=>(
-          <React.Fragment key={i}>
-            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${step===i+1?"bg-blue-600 text-white":step>i+1?"bg-emerald-50 text-emerald-700":"bg-slate-100 text-slate-400"}`}>
-              {step>i+1?<CheckCheck size={12}/>:<span>{i+1}</span>}{s}
-            </div>
-            {i<2&&<div className={`h-0.5 flex-1 mx-1 ${step>i+1?"bg-emerald-300":"bg-slate-200"}`}/>}
-          </React.Fragment>
-        ))}
-      </div>
-      {step===1&&<div className="space-y-4">
-        <div className="grid grid-cols-2 gap-4">
-          <Fld label="Contact Name *"><input value={nLead.name} onChange={e=>setNL(p=>({...p,name:e.target.value}))} className={IC} placeholder="John Smith"/></Fld>
-          <Fld label="Company Name *"><input value={nLead.company} onChange={e=>setNL(p=>({...p,company:e.target.value}))} className={IC} placeholder="Acme Corp"/></Fld>
-        </div>
-        <Fld label="Division / Sub-brand" hint="optional"><input value={nLead.division} onChange={e=>setNL(p=>({...p,division:e.target.value}))} className={IC} placeholder="e.g. Fashion, PropTech"/></Fld>
-        <Fld label="Email Address"><input value={nLead.email} onChange={e=>setNL(p=>({...p,email:e.target.value}))} className={IC} placeholder="john@company.com"/></Fld>
-        <Fld label="Phone Number">
-          <PhoneInput code={nLead.countryCode} phone={nLead.phone} onCode={v=>setNL(p=>({...p,countryCode:v}))} onPhone={v=>setNL(p=>({...p,phone:v}))}/>
-        </Fld>
-        <div className="grid grid-cols-2 gap-4">
-          <Fld label="Country">
-            <select value={nLead.country} onChange={e=>{const cur=defaultCurrency(e.target.value);const code=defaultCode(e.target.value);setNL(p=>({...p,country:e.target.value,currency:cur,countryCode:code}));}} className={IC}>
-              {[...COUNTRIES,"Other"].map(c=><option key={c}>{c}</option>)}
-            </select>
-          </Fld>
-          <Fld label="Source">
-            <select value={nLead.source} onChange={e=>setNL(p=>({...p,source:e.target.value}))} className={IC}>
-              {SOURCES.map(s=><option key={s}>{s}</option>)}
-            </select>
-          </Fld>
-        </div>
-      </div>}
-      {step===2&&<div className="space-y-4">
-        <div className="grid grid-cols-2 gap-4">
-          <Fld label="Deal Type">
-            <select value={nLead.dealType} onChange={e=>setNL(p=>({...p,dealType:e.target.value}))} className={IC}>
-              <option value="one_time">One-Time</option>
-              <option value="recurring">Recurring / Retainer</option>
-            </select>
-          </Fld>
-          <Fld label="Status">
-            <select value={nLead.status} onChange={e=>setNL(p=>({...p,status:e.target.value}))} className={IC}>
-              <option value="open">Open</option>
-              <option value="active">Active</option>
-            </select>
-          </Fld>
-        </div>
-        <Fld label="Total Deal Value *">
-          <CurrencyInput value={nLead.value} currency={nLead.currency} onValue={v=>setNL(p=>({...p,value:v}))} onCurrency={v=>setNL(p=>({...p,currency:v}))} placeholder="50000"/>
-        </Fld>
-        {nLead.dealType==="recurring"&&<Fld label="Monthly Recurring Value" hint="auto-added to payments each month">
-          <CurrencyInput value={nLead.recurringMonthlyValue} currency={nLead.currency} onValue={v=>setNL(p=>({...p,recurringMonthlyValue:v}))} onCurrency={v=>setNL(p=>({...p,currency:v}))} placeholder="5000"/>
-        </Fld>}
-        <Fld label="Assigned Sales Rep *">
-          <select value={nLead.salesPersonId} onChange={e=>setNL(p=>({...p,salesPersonId:e.target.value}))} className={IC}>
-            <option value="">Select rep…</option>
-            {users.filter(u=>u.role==="sales"||isAdmin({role:u.role})).map(u=><option key={u.id} value={u.id}>{u.name} — {u.territories.join(", ")||"All"}</option>)}
-          </select>
-        </Fld>
-      </div>}
-      {step===3&&<div className="space-y-4">
-        <Fld label="Services Interested In">
-          <div className="grid grid-cols-2 gap-2 max-h-56 overflow-y-auto border border-slate-200 rounded-xl p-3 bg-slate-50">
-            {SERVICE_TYPES.map(s=><label key={s} className="flex items-center gap-2 cursor-pointer text-sm text-slate-700 hover:text-blue-700 py-0.5">
-              <input type="checkbox" checked={(nLead.services||[]).includes(s)} onChange={ev=>setNL(p=>({...p,services:ev.target.checked?[...(p.services||[]),s]:(p.services||[]).filter(x=>x!==s)}))} className="rounded accent-blue-600"/>
-              {s}
-            </label>)}
-          </div>
-        </Fld>
-        <Fld label="Notes">
-          <textarea value={nLead.notes} onChange={e=>setNL(p=>({...p,notes:e.target.value}))} className={IC+" h-24 resize-none"} placeholder="Budget signals, decision timeline, competition…"/>
-        </Fld>
-        {(nLead.services||[]).length>0&&<div>
-          <p className="text-xs text-slate-400 font-semibold uppercase mb-2">Selected Services</p>
-          <div className="flex flex-wrap gap-1.5">{(nLead.services||[]).map(s=><ServiceTag key={s} s={s}/>)}</div>
-        </div>}
-      </div>}
-      <div className="flex justify-between pt-4 border-t border-slate-100">
-        <button onClick={()=>step>1?setStep(s=>s-1):onClose()} className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-xl flex items-center gap-1">
-          {step>1&&<ChevronLeft size={14}/>}{step>1?"Back":"Cancel"}
-        </button>
-        <button onClick={()=>{if(step===1&&!valid1)return;if(step===2&&!valid2)return;step===3?onSave():setStep(s=>s+1);}} disabled={(step===1&&!valid1)||(step===2&&!valid2)}
-          className="px-5 py-2 text-sm font-bold bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white rounded-xl shadow-sm flex items-center gap-1">
-          {step===3?"Save Lead":"Next"}<ChevronRight size={14}/>
-        </button>
-      </div>
-    </Modal>
-  );
-};
-
 /* eslint-disable */
 import React, { useState, useMemo, useEffect, useRef } from "react";
 import {
@@ -302,7 +203,107 @@ const Modal=({title,onClose,onSave,saveLabel="Save",wide=false,xl=false,noFooter
     </div>
   </div>
 );
-
+Of course! Let's do this step by step, very simply.
+Step 1 — Open your App.js file and use Ctrl+F (or Cmd+F on Mac) to search for this exact text:
+// ─── LOGIN
+Step 2 — Just above that line, paste this entire block:
+jsconst AddLeadWizard = ({ nLead, setNL, onClose, onSave, users, isAdmin }) => {
+  const [step, setStep] = useState(1);
+  const steps = ["Contact Info","Deal Details","Services & Notes"];
+  const valid1 = nLead.name && nLead.company;
+  const valid2 = nLead.value && nLead.salesPersonId;
+  return (
+    <Modal title="Add New Lead" onClose={onClose} onSave={step===3?onSave:()=>setStep(s=>s+1)} saveLabel={step===3?"Save Lead":"Next →"} xl noFooter>
+      <div className="flex items-center gap-0 mb-6 -mt-2">
+        {steps.map((s,i)=>(
+          <React.Fragment key={i}>
+            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${step===i+1?"bg-blue-600 text-white":step>i+1?"bg-emerald-50 text-emerald-700":"bg-slate-100 text-slate-400"}`}>
+              {step>i+1?<CheckCheck size={12}/>:<span>{i+1}</span>}{s}
+            </div>
+            {i<2&&<div className={`h-0.5 flex-1 mx-1 ${step>i+1?"bg-emerald-300":"bg-slate-200"}`}/>}
+          </React.Fragment>
+        ))}
+      </div>
+      {step===1&&<div className="space-y-4">
+        <div className="grid grid-cols-2 gap-4">
+          <Fld label="Contact Name *"><input value={nLead.name} onChange={e=>setNL(p=>({...p,name:e.target.value}))} className={IC} placeholder="John Smith"/></Fld>
+          <Fld label="Company Name *"><input value={nLead.company} onChange={e=>setNL(p=>({...p,company:e.target.value}))} className={IC} placeholder="Acme Corp"/></Fld>
+        </div>
+        <Fld label="Division / Sub-brand" hint="optional"><input value={nLead.division} onChange={e=>setNL(p=>({...p,division:e.target.value}))} className={IC} placeholder="e.g. Fashion, PropTech"/></Fld>
+        <Fld label="Email Address"><input value={nLead.email} onChange={e=>setNL(p=>({...p,email:e.target.value}))} className={IC} placeholder="john@company.com"/></Fld>
+        <Fld label="Phone Number">
+          <PhoneInput code={nLead.countryCode} phone={nLead.phone} onCode={v=>setNL(p=>({...p,countryCode:v}))} onPhone={v=>setNL(p=>({...p,phone:v}))}/>
+        </Fld>
+        <div className="grid grid-cols-2 gap-4">
+          <Fld label="Country">
+            <select value={nLead.country} onChange={e=>{const cur=defaultCurrency(e.target.value);const code=defaultCode(e.target.value);setNL(p=>({...p,country:e.target.value,currency:cur,countryCode:code}));}} className={IC}>
+              {[...COUNTRIES,"Other"].map(c=><option key={c}>{c}</option>)}
+            </select>
+          </Fld>
+          <Fld label="Source">
+            <select value={nLead.source} onChange={e=>setNL(p=>({...p,source:e.target.value}))} className={IC}>
+              {SOURCES.map(s=><option key={s}>{s}</option>)}
+            </select>
+          </Fld>
+        </div>
+      </div>}
+      {step===2&&<div className="space-y-4">
+        <div className="grid grid-cols-2 gap-4">
+          <Fld label="Deal Type">
+            <select value={nLead.dealType} onChange={e=>setNL(p=>({...p,dealType:e.target.value}))} className={IC}>
+              <option value="one_time">One-Time</option>
+              <option value="recurring">Recurring / Retainer</option>
+            </select>
+          </Fld>
+          <Fld label="Status">
+            <select value={nLead.status} onChange={e=>setNL(p=>({...p,status:e.target.value}))} className={IC}>
+              <option value="open">Open</option>
+              <option value="active">Active</option>
+            </select>
+          </Fld>
+        </div>
+        <Fld label="Total Deal Value *">
+          <CurrencyInput value={nLead.value} currency={nLead.currency} onValue={v=>setNL(p=>({...p,value:v}))} onCurrency={v=>setNL(p=>({...p,currency:v}))} placeholder="50000"/>
+        </Fld>
+        {nLead.dealType==="recurring"&&<Fld label="Monthly Recurring Value" hint="auto-added to payments each month">
+          <CurrencyInput value={nLead.recurringMonthlyValue} currency={nLead.currency} onValue={v=>setNL(p=>({...p,recurringMonthlyValue:v}))} onCurrency={v=>setNL(p=>({...p,currency:v}))} placeholder="5000"/>
+        </Fld>}
+        <Fld label="Assigned Sales Rep *">
+          <select value={nLead.salesPersonId} onChange={e=>setNL(p=>({...p,salesPersonId:e.target.value}))} className={IC}>
+            <option value="">Select rep…</option>
+            {users.filter(u=>u.role==="sales"||isAdmin({role:u.role})).map(u=><option key={u.id} value={u.id}>{u.name} — {u.territories.join(", ")||"All"}</option>)}
+          </select>
+        </Fld>
+      </div>}
+      {step===3&&<div className="space-y-4">
+        <Fld label="Services Interested In">
+          <div className="grid grid-cols-2 gap-2 max-h-56 overflow-y-auto border border-slate-200 rounded-xl p-3 bg-slate-50">
+            {SERVICE_TYPES.map(s=><label key={s} className="flex items-center gap-2 cursor-pointer text-sm text-slate-700 hover:text-blue-700 py-0.5">
+              <input type="checkbox" checked={(nLead.services||[]).includes(s)} onChange={ev=>setNL(p=>({...p,services:ev.target.checked?[...(p.services||[]),s]:(p.services||[]).filter(x=>x!==s)}))} className="rounded accent-blue-600"/>
+              {s}
+            </label>)}
+          </div>
+        </Fld>
+        <Fld label="Notes">
+          <textarea value={nLead.notes} onChange={e=>setNL(p=>({...p,notes:e.target.value}))} className={IC+" h-24 resize-none"} placeholder="Budget signals, decision timeline, competition…"/>
+        </Fld>
+        {(nLead.services||[]).length>0&&<div>
+          <p className="text-xs text-slate-400 font-semibold uppercase mb-2">Selected Services</p>
+          <div className="flex flex-wrap gap-1.5">{(nLead.services||[]).map(s=><ServiceTag key={s} s={s}/>)}</div>
+        </div>}
+      </div>}
+      <div className="flex justify-between pt-4 border-t border-slate-100">
+        <button onClick={()=>step>1?setStep(s=>s-1):onClose()} className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-xl flex items-center gap-1">
+          {step>1&&<ChevronLeft size={14}/>}{step>1?"Back":"Cancel"}
+        </button>
+        <button onClick={()=>{if(step===1&&!valid1)return;if(step===2&&!valid2)return;step===3?onSave():setStep(s=>s+1);}} disabled={(step===1&&!valid1)||(step===2&&!valid2)}
+          className="px-5 py-2 text-sm font-bold bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white rounded-xl shadow-sm flex items-center gap-1">
+          {step===3?"Save Lead":"Next"}<ChevronRight size={14}/>
+        </button>
+      </div>
+    </Modal>
+  );
+};
 // ─── LOGIN ────────────────────────────────────────────────────────────────────
 const LoginScreen=({onLogin,users,onResetUsers})=>{
   const [email,setEmail]=useState(""); const [pw,setPw]=useState(""); const [showPw,setShowPw]=useState(false); const [err,setErr]=useState("");
