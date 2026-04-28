@@ -1,5 +1,105 @@
+
+// ── AddLeadWizard — defined OUTSIDE App so it never remounts on parent re-render
+const AddLeadWizard = ({ nLead, setNL, onClose, onSave, users, isAdmin }) => {
+  const [step, setStep] = useState(1);
+  const steps = ["Contact Info","Deal Details","Services & Notes"];
+  const valid1 = nLead.name && nLead.company;
+  const valid2 = nLead.value && nLead.salesPersonId;
+  return (
+    <Modal title="Add New Lead" onClose={onClose} onSave={step===3?onSave:()=>setStep(s=>s+1)} saveLabel={step===3?"Save Lead":"Next →"} xl noFooter>
+      <div className="flex items-center gap-0 mb-6 -mt-2">
+        {steps.map((s,i)=>(
+          <React.Fragment key={i}>
+            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${step===i+1?"bg-blue-600 text-white":step>i+1?"bg-emerald-50 text-emerald-700":"bg-slate-100 text-slate-400"}`}>
+              {step>i+1?<CheckCheck size={12}/>:<span>{i+1}</span>}{s}
+            </div>
+            {i<2&&<div className={`h-0.5 flex-1 mx-1 ${step>i+1?"bg-emerald-300":"bg-slate-200"}`}/>}
+          </React.Fragment>
+        ))}
+      </div>
+      {step===1&&<div className="space-y-4">
+        <div className="grid grid-cols-2 gap-4">
+          <Fld label="Contact Name *"><input value={nLead.name} onChange={e=>setNL(p=>({...p,name:e.target.value}))} className={IC} placeholder="John Smith"/></Fld>
+          <Fld label="Company Name *"><input value={nLead.company} onChange={e=>setNL(p=>({...p,company:e.target.value}))} className={IC} placeholder="Acme Corp"/></Fld>
+        </div>
+        <Fld label="Division / Sub-brand" hint="optional"><input value={nLead.division} onChange={e=>setNL(p=>({...p,division:e.target.value}))} className={IC} placeholder="e.g. Fashion, PropTech"/></Fld>
+        <Fld label="Email Address"><input value={nLead.email} onChange={e=>setNL(p=>({...p,email:e.target.value}))} className={IC} placeholder="john@company.com"/></Fld>
+        <Fld label="Phone Number">
+          <PhoneInput code={nLead.countryCode} phone={nLead.phone} onCode={v=>setNL(p=>({...p,countryCode:v}))} onPhone={v=>setNL(p=>({...p,phone:v}))}/>
+        </Fld>
+        <div className="grid grid-cols-2 gap-4">
+          <Fld label="Country">
+            <select value={nLead.country} onChange={e=>{const cur=defaultCurrency(e.target.value);const code=defaultCode(e.target.value);setNL(p=>({...p,country:e.target.value,currency:cur,countryCode:code}));}} className={IC}>
+              {[...COUNTRIES,"Other"].map(c=><option key={c}>{c}</option>)}
+            </select>
+          </Fld>
+          <Fld label="Source">
+            <select value={nLead.source} onChange={e=>setNL(p=>({...p,source:e.target.value}))} className={IC}>
+              {SOURCES.map(s=><option key={s}>{s}</option>)}
+            </select>
+          </Fld>
+        </div>
+      </div>}
+      {step===2&&<div className="space-y-4">
+        <div className="grid grid-cols-2 gap-4">
+          <Fld label="Deal Type">
+            <select value={nLead.dealType} onChange={e=>setNL(p=>({...p,dealType:e.target.value}))} className={IC}>
+              <option value="one_time">One-Time</option>
+              <option value="recurring">Recurring / Retainer</option>
+            </select>
+          </Fld>
+          <Fld label="Status">
+            <select value={nLead.status} onChange={e=>setNL(p=>({...p,status:e.target.value}))} className={IC}>
+              <option value="open">Open</option>
+              <option value="active">Active</option>
+            </select>
+          </Fld>
+        </div>
+        <Fld label="Total Deal Value *">
+          <CurrencyInput value={nLead.value} currency={nLead.currency} onValue={v=>setNL(p=>({...p,value:v}))} onCurrency={v=>setNL(p=>({...p,currency:v}))} placeholder="50000"/>
+        </Fld>
+        {nLead.dealType==="recurring"&&<Fld label="Monthly Recurring Value" hint="auto-added to payments each month">
+          <CurrencyInput value={nLead.recurringMonthlyValue} currency={nLead.currency} onValue={v=>setNL(p=>({...p,recurringMonthlyValue:v}))} onCurrency={v=>setNL(p=>({...p,currency:v}))} placeholder="5000"/>
+        </Fld>}
+        <Fld label="Assigned Sales Rep *">
+          <select value={nLead.salesPersonId} onChange={e=>setNL(p=>({...p,salesPersonId:e.target.value}))} className={IC}>
+            <option value="">Select rep…</option>
+            {users.filter(u=>u.role==="sales"||isAdmin({role:u.role})).map(u=><option key={u.id} value={u.id}>{u.name} — {u.territories.join(", ")||"All"}</option>)}
+          </select>
+        </Fld>
+      </div>}
+      {step===3&&<div className="space-y-4">
+        <Fld label="Services Interested In">
+          <div className="grid grid-cols-2 gap-2 max-h-56 overflow-y-auto border border-slate-200 rounded-xl p-3 bg-slate-50">
+            {SERVICE_TYPES.map(s=><label key={s} className="flex items-center gap-2 cursor-pointer text-sm text-slate-700 hover:text-blue-700 py-0.5">
+              <input type="checkbox" checked={(nLead.services||[]).includes(s)} onChange={ev=>setNL(p=>({...p,services:ev.target.checked?[...(p.services||[]),s]:(p.services||[]).filter(x=>x!==s)}))} className="rounded accent-blue-600"/>
+              {s}
+            </label>)}
+          </div>
+        </Fld>
+        <Fld label="Notes">
+          <textarea value={nLead.notes} onChange={e=>setNL(p=>({...p,notes:e.target.value}))} className={IC+" h-24 resize-none"} placeholder="Budget signals, decision timeline, competition…"/>
+        </Fld>
+        {(nLead.services||[]).length>0&&<div>
+          <p className="text-xs text-slate-400 font-semibold uppercase mb-2">Selected Services</p>
+          <div className="flex flex-wrap gap-1.5">{(nLead.services||[]).map(s=><ServiceTag key={s} s={s}/>)}</div>
+        </div>}
+      </div>}
+      <div className="flex justify-between pt-4 border-t border-slate-100">
+        <button onClick={()=>step>1?setStep(s=>s-1):onClose()} className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-xl flex items-center gap-1">
+          {step>1&&<ChevronLeft size={14}/>}{step>1?"Back":"Cancel"}
+        </button>
+        <button onClick={()=>{if(step===1&&!valid1)return;if(step===2&&!valid2)return;step===3?onSave():setStep(s=>s+1);}} disabled={(step===1&&!valid1)||(step===2&&!valid2)}
+          className="px-5 py-2 text-sm font-bold bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white rounded-xl shadow-sm flex items-center gap-1">
+          {step===3?"Save Lead":"Next"}<ChevronRight size={14}/>
+        </button>
+      </div>
+    </Modal>
+  );
+};
+
 /* eslint-disable */
-import { useState, useMemo, useEffect, useRef } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import {
   LayoutDashboard, Target, Briefcase, Users, CheckSquare,
   Search, Plus, X, Sparkles, ChevronRight, ChevronDown, LogOut, Shield,
@@ -205,7 +305,7 @@ const Modal=({title,onClose,onSave,saveLabel="Save",wide=false,xl=false,noFooter
 
 // ─── LOGIN ────────────────────────────────────────────────────────────────────
 const LoginScreen=({onLogin,users,onResetUsers})=>{
-  const [email,setEmail]=useState(""); const [pw,setPw]=useState(""); const [showPw,setShowPw]=useState(false); const [showAll,setShowAll]=useState(false); const [err,setErr]=useState("");
+  const [email,setEmail]=useState(""); const [pw,setPw]=useState(""); const [showPw,setShowPw]=useState(false); const [err,setErr]=useState("");
   const login=()=>{ const u=users.find(u=>u.email.toLowerCase().trim()===email.toLowerCase().trim()&&u.password===pw); if(u)onLogin(u); else setErr("Incorrect email or password."); };
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-4">
@@ -218,17 +318,7 @@ const LoginScreen=({onLogin,users,onResetUsers})=>{
             <Fld label="Password"><div className="relative"><Lock size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"/><input type={showPw?"text":"password"} value={pw} onChange={e=>{setPw(e.target.value);setErr("");}} onKeyDown={e=>e.key==="Enter"&&login()} placeholder="••••••••" className="w-full pl-9 pr-10 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"/><button onClick={()=>setShowPw(!showPw)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400">{showPw?<EyeOff size={15}/>:<Eye size={15}/>}</button></div></Fld>
           </div>
           <button onClick={login} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-xl transition-all active:scale-95 shadow-md">Sign In</button>
-          <div className="mt-6 pt-5 border-t border-slate-100">
-            <button onClick={()=>setShowAll(p=>!p)} className="w-full flex items-center justify-between text-xs text-slate-400 hover:text-slate-600 font-semibold mb-2">{showAll?"▲":"▼"} ALL ACCOUNTS ({users.length}) — click to autofill</button>
-            {showAll&&<div className="space-y-1.5 max-h-60 overflow-y-auto pr-1">{users.map(u=>(
-              <button key={u.id} onClick={()=>{setEmail(u.email);setPw(u.password);setErr("");}} className="w-full flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-slate-50 transition-colors text-left border border-slate-100">
-                <div className={`h-7 w-7 rounded-full ${userCol(u.id)} flex items-center justify-center text-white text-[9px] font-bold shrink-0`}>{inits(u.name)}</div>
-                <div className="flex-1 min-w-0"><p className="text-xs font-semibold text-slate-800">{u.name}</p><p className="text-[10px] text-slate-400">{u.email} · <span className="font-mono">{u.password}</span></p></div>
-                <RoleBadge role={u.role}/>
-              </button>
-            ))}</div>}
-            <button onClick={()=>{if(window.confirm("Reset all users to defaults?"))onResetUsers();}} className="mt-3 w-full text-[10px] text-slate-300 hover:text-rose-400 transition-colors text-center block">Reset users to defaults</button>
-          </div>
+          <p className="mt-6 text-center text-xs text-slate-400">Contact your admin for login credentials.</p>
         </div>
       </div>
     </div>
@@ -259,6 +349,7 @@ export default function App() {
   const [showAddEng,setShowAddEng]=useState(false);
   const [showAddProj,setShowAddProj]=useState(false);
   const [showAddPayment,setShowAddPayment]=useState(false);
+  const [editPayment,setEditPayment]=useState(null);
   const [showAddLead,setShowAddLead]=useState(false);
   const [showAddTask,setShowAddTask]=useState(false);
   const [showImport,setShowImport]=useState(false);
@@ -326,6 +417,7 @@ export default function App() {
   const addPayment=()=>{ if(!nPayment.description||!nPayment.amount)return; setPayments(p=>[...p,{...nPayment,id:genId("pay"),amount:Number(nPayment.amount)||0}]); setNPy(EPay); setShowAddPayment(false); };
   const markPaid=id=>setPayments(p=>p.map(pay=>pay.id===id?{...pay,status:"paid",paidDate:today}:pay));
   const markOverdue=id=>setPayments(p=>p.map(pay=>pay.id===id?{...pay,status:"overdue"}:pay));
+  const saveEditPayment=()=>{ if(!editPayment)return; setPayments(p=>p.map(pay=>pay.id===editPayment.id?{...editPayment,amount:Number(editPayment.amount)||0}:pay)); setEditPayment(null); };
 
   const addLead=()=>{ if(!nLead.name||!nLead.company)return; setLeads(p=>[...p,{...nLead,id:genId("l"),value:Number(nLead.value)||0,recurringMonthlyValue:Number(nLead.recurringMonthlyValue)||0,createdAt:today,aiScore:null,aiNote:null}]); setNL(EL); setShowAddLead(false); };
   const updateLeadStatus=(id,status)=>{ setLeads(p=>p.map(l=>l.id===id?{...l,status}:l)); if(selLead?.id===id)setSelLead(p=>({...p,status})); };
@@ -510,7 +602,7 @@ export default function App() {
                 <td className="px-6 py-4 text-sm text-slate-500">{p.dueDate}</td>
                 <td className="px-6 py-4"><span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${agingColor(days)}`}>{days>0?`${days}d overdue`:"Due soon"}</span></td>
                 <td className="px-6 py-4"><span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold ${PAY_STATUS[p.status]?.cls}`}><div className={`h-1.5 w-1.5 rounded-full ${PAY_STATUS[p.status]?.dot}`}/>{PAY_STATUS[p.status]?.label}</span></td>
-                <td className="px-6 py-4 text-right"><div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100"><button onClick={()=>markPaid(p.id)} className="text-xs font-semibold text-emerald-600 border border-emerald-200 bg-emerald-50 px-2.5 py-1 rounded-lg">Mark Paid</button></div></td>
+                <td className="px-6 py-4 text-right"><div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100"><button onClick={()=>setEditPayment({...p})} className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-blue-600"><Edit3 size={13}/></button><button onClick={()=>markPaid(p.id)} className="text-xs font-semibold text-emerald-600 border border-emerald-200 bg-emerald-50 px-2.5 py-1 rounded-lg">Mark Paid</button></div></td>
               </tr>
             );})}
           </tbody></table>
@@ -549,7 +641,7 @@ export default function App() {
                 <td className="px-6 py-4 text-sm text-slate-500">{p.dueDate}</td>
                 <td className="px-6 py-4 text-sm text-emerald-600">{p.paidDate||"—"}</td>
                 <td className="px-6 py-4"><span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold ${cfg?.cls}`}><div className={`h-1.5 w-1.5 rounded-full ${cfg?.dot}`}/>{cfg?.label}</span></td>
-                <td className="px-6 py-4 text-right"><div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100">{p.status!=="paid"&&<button onClick={()=>markPaid(p.id)} className="text-xs font-semibold text-emerald-600 border border-emerald-200 bg-emerald-50 px-2.5 py-1 rounded-lg">Mark Paid</button>}{p.status==="pending"&&<button onClick={()=>markOverdue(p.id)} className="text-xs font-semibold text-rose-500 border border-rose-200 bg-rose-50 px-2.5 py-1 rounded-lg ml-1">Overdue</button>}</div></td>
+                <td className="px-6 py-4 text-right"><div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100"><button onClick={()=>setEditPayment({...p})} className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-blue-600"><Edit3 size={13}/></button>{p.status!=="paid"&&<button onClick={()=>markPaid(p.id)} className="text-xs font-semibold text-emerald-600 border border-emerald-200 bg-emerald-50 px-2.5 py-1 rounded-lg">Mark Paid</button>}{p.status==="pending"&&<button onClick={()=>markOverdue(p.id)} className="text-xs font-semibold text-rose-500 border border-rose-200 bg-rose-50 px-2.5 py-1 rounded-lg ml-1">Overdue</button>}</div></td>
               </tr>
             );})}
           </tbody></table>
@@ -594,47 +686,7 @@ export default function App() {
   // ══════════════════════════════════════════════════════════════════════════════
   // ADD LEAD WIZARD (3-step)
   // ══════════════════════════════════════════════════════════════════════════════
-  const AddLeadWizard=()=>{
-    const [step,setStep]=useState(1);
-    const steps=["Contact Info","Deal Details","Services & Notes"];
-    const valid1=nLead.name&&nLead.company; const valid2=nLead.value&&nLead.salesPersonId;
-    return (
-      <Modal title="Add New Lead" onClose={()=>setShowAddLead(false)} onSave={step===3?addLead:()=>setStep(s=>s+1)} saveLabel={step===3?"Save Lead →":"Next →"} xl noFooter>
-        {/* Step indicator */}
-        <div className="flex items-center gap-0 mb-6 -mt-2">
-          {steps.map((s,i)=><><div key={i} className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${step===i+1?"bg-blue-600 text-white":step>i+1?"bg-emerald-50 text-emerald-700":"bg-slate-100 text-slate-400"}`}>{step>i+1?<CheckCheck size={12}/>:<span>{i+1}</span>}{s}</div>{i<2&&<div className={`h-0.5 flex-1 mx-1 ${step>i+1?"bg-emerald-300":"bg-slate-200"}`}/>}</> )}
-        </div>
-        {step===1&&<div className="space-y-4">
-          <div className="grid grid-cols-2 gap-4"><Fld label="Contact Name *"><input value={nLead.name} onChange={e=>setNL({...nLead,name:e.target.value})} className={IC} placeholder="John Smith"/></Fld><Fld label="Company Name *"><input value={nLead.company} onChange={e=>setNL({...nLead,company:e.target.value})} className={IC} placeholder="Acme Corp"/></Fld></div>
-          <Fld label="Division / Sub-brand" hint="optional"><input value={nLead.division} onChange={e=>setNL({...nLead,division:e.target.value})} className={IC} placeholder="e.g. Fashion, PropTech"/></Fld>
-          <Fld label="Email Address"><input value={nLead.email} onChange={e=>setNL({...nLead,email:e.target.value})} className={IC} placeholder="john@company.com"/></Fld>
-          <Fld label="Phone Number"><PhoneInput code={nLead.countryCode} phone={nLead.phone} onCode={v=>{setNL({...nLead,countryCode:v});}} onPhone={v=>setNL({...nLead,phone:v})}/></Fld>
-          <div className="grid grid-cols-2 gap-4">
-            <Fld label="Country"><select value={nLead.country} onChange={e=>{ const cur=defaultCurrency(e.target.value); const code=defaultCode(e.target.value); setNL({...nLead,country:e.target.value,currency:cur,countryCode:code}); }} className={IC}>{[...COUNTRIES,"Other"].map(c=><option key={c}>{c}</option>)}</select></Fld>
-            <Fld label="Source"><select value={nLead.source} onChange={e=>setNL({...nLead,source:e.target.value})} className={IC}>{SOURCES.map(s=><option key={s}>{s}</option>)}</select></Fld>
-          </div>
-        </div>}
-        {step===2&&<div className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <Fld label="Deal Type"><select value={nLead.dealType} onChange={e=>setNL({...nLead,dealType:e.target.value})} className={IC}><option value="one_time">One-Time</option><option value="recurring">Recurring / Retainer</option></select></Fld>
-            <Fld label="Status"><select value={nLead.status} onChange={e=>setNL({...nLead,status:e.target.value})} className={IC}><option value="open">Open</option><option value="active">Active</option></select></Fld>
-          </div>
-          <Fld label="Total Deal Value *"><CurrencyInput value={nLead.value} currency={nLead.currency} onValue={v=>setNL({...nLead,value:v})} onCurrency={v=>setNL({...nLead,currency:v})} placeholder="50000"/></Fld>
-          {nLead.dealType==="recurring"&&<Fld label="Monthly Recurring Value" hint="auto-added to payments each month"><CurrencyInput value={nLead.recurringMonthlyValue} currency={nLead.currency} onValue={v=>setNL({...nLead,recurringMonthlyValue:v})} onCurrency={v=>setNL({...nLead,currency:v})} placeholder="5000"/></Fld>}
-          <Fld label="Assigned Sales Rep *"><select value={nLead.salesPersonId} onChange={e=>setNL({...nLead,salesPersonId:e.target.value})} className={IC}><option value="">Select rep…</option>{users.filter(u=>u.role==="sales"||isAdmin({role:u.role})).map(u=><option key={u.id} value={u.id}>{u.name} — {u.territories.join(", ")||"All"}</option>)}</select></Fld>
-        </div>}
-        {step===3&&<div className="space-y-4">
-          <Fld label="Services Interested In"><div className="grid grid-cols-2 gap-2 max-h-56 overflow-y-auto border border-slate-200 rounded-xl p-3 bg-slate-50">{SERVICE_TYPES.map(s=><label key={s} className="flex items-center gap-2 cursor-pointer text-sm text-slate-700 hover:text-blue-700 py-0.5"><input type="checkbox" checked={(nLead.services||[]).includes(s)} onChange={ev=>setNL({...nLead,services:ev.target.checked?[...(nLead.services||[]),s]:(nLead.services||[]).filter(x=>x!==s)})} className="rounded accent-blue-600"/>{s}</label>)}</div></Fld>
-          <Fld label="Notes"><textarea value={nLead.notes} onChange={e=>setNL({...nLead,notes:e.target.value})} className={IC+" h-24 resize-none"} placeholder="Budget signals, decision timeline, competition…"/></Fld>
-          {(nLead.services||[]).length>0&&<div><p className="text-xs text-slate-400 font-semibold uppercase mb-2">Selected Services</p><div className="flex flex-wrap gap-1.5">{(nLead.services||[]).map(s=><ServiceTag key={s} s={s}/>)}</div></div>}
-        </div>}
-        <div className="flex justify-between pt-4 border-t border-slate-100">
-          <button onClick={()=>step>1?setStep(s=>s-1):setShowAddLead(false)} className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-xl flex items-center gap-1">{step>1&&<ChevronLeft size={14}/>}{step>1?"Back":"Cancel"}</button>
-          <button onClick={()=>{ if(step===1&&!valid1)return; if(step===2&&!valid2)return; step===3?addLead():setStep(s=>s+1); }} disabled={(step===1&&!valid1)||(step===2&&!valid2)} className="px-5 py-2 text-sm font-bold bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white rounded-xl shadow-sm flex items-center gap-1">{step===3?"Save Lead":"Next"}<ChevronRight size={14}/></button>
-        </div>
-      </Modal>
-    );
-  };
+  // AddLeadWizard moved outside App — see below main export
 
   // ══════════════════════════════════════════════════════════════════════════════
   // EXCEL IMPORT
@@ -727,7 +779,7 @@ export default function App() {
         </div>
       </main>
       <LeadDrawer/>
-      {showAddLead&&<AddLeadWizard/>}
+      {showAddLead&&<AddLeadWizard nLead={nLead} setNL={setNL} onClose={()=>setShowAddLead(false)} onSave={addLead} users={users} isAdmin={isAdmin}/>}
       {showImport&&<ImportModal/>}
 
       {/* Add User */}
@@ -793,6 +845,29 @@ export default function App() {
         <div className="grid grid-cols-2 gap-4"><Fld label="Due Date"><input type="date" value={nTask.dueDate} onChange={e=>setNT({...nTask,dueDate:e.target.value})} className={IC}/></Fld><Fld label="Priority"><select value={nTask.priority} onChange={e=>setNT({...nTask,priority:e.target.value})} className={IC}><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select></Fld></div>
         <div className="grid grid-cols-2 gap-4"><Fld label="Type"><select value={nTask.type} onChange={e=>setNT({...nTask,type:e.target.value})} className={IC}>{TASK_TYPES.map(t=><option key={t}>{t}</option>)}</select></Fld><Fld label="Assigned To"><select value={nTask.assignedTo} onChange={e=>setNT({...nTask,assignedTo:e.target.value})} className={IC}><option value="">Select…</option>{users.map(u=><option key={u.id} value={u.id}>{u.name}</option>)}</select></Fld></div>
         <div className="grid grid-cols-2 gap-4"><Fld label="Linked Lead"><select value={nTask.leadId} onChange={e=>setNT({...nTask,leadId:e.target.value})} className={IC}><option value="">None</option>{leads.map(l=><option key={l.id} value={l.id}>{l.name} — {l.company}</option>)}</select></Fld><Fld label="Linked Project"><select value={nTask.projectId} onChange={e=>setNT({...nTask,projectId:e.target.value})} className={IC}><option value="">None</option>{projects.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></Fld></div>
+      </Modal>}
+
+      {/* Edit Payment */}
+      {editPayment&&<Modal title="Edit Payment / Invoice" onClose={()=>setEditPayment(null)} onSave={saveEditPayment} saveLabel="Save Changes" wide>
+        <Fld label="Description"><input value={editPayment.description} onChange={e=>setEditPayment({...editPayment,description:e.target.value})} className={IC}/></Fld>
+        <div className="grid grid-cols-2 gap-4">
+          <Fld label="Amount"><CurrencyInput value={editPayment.amount} currency={editPayment.currency||"USD"} onValue={v=>setEditPayment({...editPayment,amount:v})} onCurrency={v=>setEditPayment({...editPayment,currency:v})}/></Fld>
+          <Fld label="Due Date"><input type="date" value={editPayment.dueDate||""} onChange={e=>setEditPayment({...editPayment,dueDate:e.target.value,month:e.target.value.slice(0,7)})} className={IC}/></Fld>
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <Fld label="Status">
+            <select value={editPayment.status} onChange={e=>setEditPayment({...editPayment,status:e.target.value})} className={IC}>
+              <option value="pending">Pending</option>
+              <option value="paid">Paid</option>
+              <option value="overdue">Overdue</option>
+            </select>
+          </Fld>
+          <Fld label="Date Payment Received" hint="only if paid">
+            <input type="date" value={editPayment.paidDate||""} onChange={e=>setEditPayment({...editPayment,paidDate:e.target.value})} className={IC}/>
+          </Fld>
+        </div>
+        <Fld label="Month (YYYY-MM)"><input value={editPayment.month||""} onChange={e=>setEditPayment({...editPayment,month:e.target.value})} className={IC} placeholder="2024-03"/></Fld>
+        {editPayment.status!=="paid"&&<div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-700">To reverse a paid status, change Status above to Pending or Overdue and clear the received date.</div>}
       </Modal>}
 
       {/* Add Client */}
