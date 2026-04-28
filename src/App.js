@@ -204,7 +204,7 @@ const Modal=({title,onClose,onSave,saveLabel="Save",wide=false,xl=false,noFooter
   </div>
 );
 // ─── LOGIN
-jsconst AddLeadWizard = ({ nLead, setNL, onClose, onSave, users, isAdmin }) => {
+const AddLeadWizard = ({ nLead, setNL, onClose, onSave, users, isAdmin }) => {
   const [step, setStep] = useState(1);
   const steps = ["Contact Info","Deal Details","Services & Notes"];
   const valid1 = nLead.name && nLead.company;
