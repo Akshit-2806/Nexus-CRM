@@ -1,4 +1,3 @@
-
 /* eslint-disable */
 import React, { useState, useMemo, useEffect, useRef } from "react";
 import {
@@ -10,6 +9,7 @@ import {
   Filter, CalendarRange, SlidersHorizontal, Tag, RefreshCw, Clock,
   AlertTriangle, FileSpreadsheet, Upload, ChevronLeft, CheckCheck
 } from "lucide-react";
+import { supabase } from "./supabaseClient";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const COUNTRIES = ["Singapore","India","Thailand","UAE","Indonesia"];
@@ -61,65 +61,6 @@ const PAY_STATUS  = { paid:{cls:"bg-emerald-50 text-emerald-700",label:"Paid",do
 const PRIO_COL    = { high:"text-rose-600 bg-rose-50",medium:"text-amber-600 bg-amber-50",low:"text-slate-500 bg-slate-100" };
 const USER_COLORS = ["bg-violet-500","bg-pink-500","bg-sky-500","bg-emerald-500","bg-orange-500","bg-indigo-500","bg-teal-500","bg-rose-500","bg-cyan-500","bg-lime-600"];
 
-// ─── Persistence ──────────────────────────────────────────────────────────────
-const LS = { get:(k,d)=>{ try{ const v=localStorage.getItem(k); return v?JSON.parse(v):d; }catch{ return d; } }, set:(k,v)=>{ try{ localStorage.setItem(k,JSON.stringify(v)); }catch{} } };
-
-// ─── Seed Data ────────────────────────────────────────────────────────────────
-const SEED_USERS = [
-  { id:"u1",name:"Raj Patel",    email:"admin@nexus.com",  password:"super123", role:"super_admin", territories:[],                    commissionRate:0, phone:"9876543210", countryCode:"+91",  designation:"CEO" },
-  { id:"u2",name:"Priya Kapoor", email:"priya@nexus.com",  password:"admin123", role:"admin",       territories:["Singapore","India"], commissionRate:0, phone:"8123456789", countryCode:"+91",  designation:"Regional Director" },
-  { id:"u3",name:"Sarah Chen",   email:"sarah@nexus.com",  password:"pass123",  role:"sales",       territories:["Singapore","India"], commissionRate:8, phone:"91234567",   countryCode:"+65",  designation:"Senior AE" },
-  { id:"u4",name:"Omar Hassan",  email:"omar@nexus.com",   password:"pass123",  role:"sales",       territories:["UAE","Indonesia"],   commissionRate:7, phone:"501234567",  countryCode:"+971", designation:"Account Executive" },
-  { id:"u5",name:"Elena Vance",  email:"elena@nexus.com",  password:"pass123",  role:"engagement",  territories:[],                    commissionRate:0, phone:"81234568",   countryCode:"+65",  designation:"Engagement Manager" },
-  { id:"u6",name:"Marcus Bloom", email:"marcus@nexus.com", password:"pass123",  role:"projects",    territories:[],                    commissionRate:0, phone:"81234569",   countryCode:"+65",  designation:"Project Manager" },
-];
-const SEED_CLIENTS = [
-  { id:"cl1",name:"TechFlow Inc",   contact:"David Kim",    email:"david@techflow.com", phone:"91234567",   countryCode:"+65",  country:"Singapore" },
-  { id:"cl2",name:"Gulf Ventures",  contact:"Fatima Al-R.", email:"fatima@gulfv.ae",    phone:"501234567",  countryCode:"+971", country:"UAE" },
-  { id:"cl3",name:"DataNest India", contact:"Priya Sharma", email:"priya@datanest.io",  phone:"9876543210", countryCode:"+91",  country:"India" },
-  { id:"cl4",name:"Maju Digital",   contact:"Budi Santoso", email:"budi@maju.co.id",    phone:"81234567",   countryCode:"+62",  country:"Indonesia" },
-];
-const SEED_ENGAGEMENTS = [
-  { id:"en1",clientId:"cl1",name:"Digital Transformation 2024",salesPersonId:"u3",pmId:"u5",status:"active",   value:150000,currency:"SGD",startDate:"2024-01-15",notes:"Flagship account." },
-  { id:"en2",clientId:"cl2",name:"Platform Launch — MENA",     salesPersonId:"u4",pmId:"u5",status:"active",   value:95000, currency:"AED",startDate:"2024-02-01",notes:"Multi-phase delivery." },
-  { id:"en3",clientId:"cl3",name:"Brand & Growth Programme",   salesPersonId:"u3",pmId:"u6",status:"active",   value:48000, currency:"INR",startDate:"2024-02-15",notes:"SEO + content + social." },
-  { id:"en4",clientId:"cl4",name:"E-Commerce Overhaul",        salesPersonId:"u4",pmId:"u5",status:"paused",   value:62000, currency:"IDR",startDate:"2024-01-20",notes:"On hold — budget review." },
-];
-const SEED_PROJECTS = [
-  { id:"pr1",engagementId:"en1",name:"Website Redesign",    assignedTo:["u3","u6"],status:"active",   value:55000,currency:"SGD",type:"Development",     notes:"Next.js build" },
-  { id:"pr2",engagementId:"en1",name:"SEO Campaign",        assignedTo:["u5"],     status:"active",   value:24000,currency:"SGD",type:"SEO",             notes:"12-month retainer",recurring:true,recurringDay:1,recurringAmount:2000 },
-  { id:"pr3",engagementId:"en1",name:"Digital Marketing",   assignedTo:["u5","u3"],status:"active",   value:36000,currency:"SGD",type:"Digital Marketing",notes:"Google + Meta Ads",recurring:true,recurringDay:1,recurringAmount:3000 },
-  { id:"pr4",engagementId:"en2",name:"Mobile App",          assignedTo:["u6","u5"],status:"active",   value:65000,currency:"AED",type:"Development",     notes:"React Native" },
-  { id:"pr5",engagementId:"en3",name:"Brand Identity",      assignedTo:["u5"],     status:"completed",value:12000,currency:"INR",type:"Design",          notes:"Logo + guidelines" },
-  { id:"pr6",engagementId:"en3",name:"Social Media Mgmt",   assignedTo:["u3","u5"],status:"active",   value:18000,currency:"INR",type:"Social Media",    notes:"4 platforms" },
-];
-const today = new Date().toISOString().split("T")[0];
-const ago = days => { const d=new Date(); d.setDate(d.getDate()-days); return d.toISOString().split("T")[0]; };
-const SEED_PAYMENTS = [
-  { id:"pay1",engagementId:"en1",projectId:"pr1",clientId:"cl1",description:"Website Redesign — Phase 1",amount:27500,currency:"SGD",dueDate:ago(45), paidDate:ago(46),status:"paid",   month:"2024-02",recurring:false },
-  { id:"pay2",engagementId:"en1",projectId:"pr1",clientId:"cl1",description:"Website Redesign — Phase 2",amount:27500,currency:"SGD",dueDate:ago(5),  paidDate:null,   status:"pending",month:"2024-04",recurring:false },
-  { id:"pay3",engagementId:"en1",projectId:"pr2",clientId:"cl1",description:"SEO — Jan Retainer",         amount:2000, currency:"SGD",dueDate:ago(95), paidDate:ago(94),status:"paid",   month:"2024-01",recurring:true },
-  { id:"pay4",engagementId:"en1",projectId:"pr2",clientId:"cl1",description:"SEO — Feb Retainer",         amount:2000, currency:"SGD",dueDate:ago(65), paidDate:ago(63),status:"paid",   month:"2024-02",recurring:true },
-  { id:"pay5",engagementId:"en1",projectId:"pr3",clientId:"cl1",description:"Dig. Mktg — Q1 Budget",      amount:9000, currency:"SGD",dueDate:ago(95), paidDate:null,   status:"overdue",month:"2024-03",recurring:false },
-  { id:"pay6",engagementId:"en2",projectId:"pr4",clientId:"cl2",description:"Mobile App — Milestone 1",   amount:25000,currency:"AED",dueDate:ago(50), paidDate:ago(49),status:"paid",   month:"2024-02",recurring:false },
-  { id:"pay7",engagementId:"en2",projectId:"pr4",clientId:"cl2",description:"Mobile App — Milestone 2",   amount:25000,currency:"AED",dueDate:ago(10), paidDate:null,   status:"pending",month:"2024-04",recurring:false },
-  { id:"pay8",engagementId:"en3",projectId:"pr5",clientId:"cl3",description:"Brand Identity — Full",      amount:12000,currency:"INR",dueDate:ago(70), paidDate:ago(71),status:"paid",   month:"2024-02",recurring:false },
-  { id:"pay9",engagementId:"en3",projectId:"pr6",clientId:"cl3",description:"Social Media — Q1 Retainer", amount:4500, currency:"INR",dueDate:ago(100),paidDate:null,   status:"overdue",month:"2024-03",recurring:false },
-  { id:"pay10",engagementId:"en1",projectId:"pr2",clientId:"cl1",description:"SEO — Mar Retainer",        amount:2000, currency:"SGD",dueDate:ago(35), paidDate:null,   status:"overdue",month:"2024-03",recurring:true },
-];
-const SEED_LEADS = [
-  { id:"l1",name:"Wei Lin",     company:"FinTech SG",  division:"",       email:"wei@fintechsg.com",  phone:"91234001",countryCode:"+65", country:"Singapore",status:"active",     value:45000,currency:"SGD",salesPersonId:"u3",source:"Inbound", createdAt:"2024-01-15",aiScore:null,aiNote:null,notes:"Full digital suite",   services:["Website Development","SEO"],       dealType:"one_time" },
-  { id:"l2",name:"Ahmed Al-M.", company:"Dubai PropCo",division:"PropTech",email:"ahmed@dubaiprop.ae", phone:"501234001",countryCode:"+971",country:"UAE",      status:"open",       value:80000,currency:"AED",salesPersonId:"u4",source:"Referral",createdAt:"2024-02-01",aiScore:null,aiNote:null,notes:"Real estate portal",   services:["E-Commerce Development"],          dealType:"recurring",recurringMonthlyValue:8000 },
-  { id:"l3",name:"Kavya Nair",  company:"EdTech India",division:"",       email:"kavya@edtech.in",    phone:"9876500001",countryCode:"+91",country:"India",    status:"closed_won", value:35000,currency:"INR",salesPersonId:"u3",source:"Outbound",createdAt:"2023-12-10",aiScore:82, aiNote:"Strong fit.",notes:"Won Q4 2023",          services:["Digital Marketing","Social Media Marketing"],dealType:"recurring",recurringMonthlyValue:3500 },
-  { id:"l4",name:"Andi Wijaya", company:"Tokobaju.id", division:"Fashion",email:"andi@tokobaju.id",   phone:"81234001",countryCode:"+62",country:"Indonesia",status:"active",     value:28000,currency:"IDR",salesPersonId:"u4",source:"Event",    createdAt:"2024-02-10",aiScore:null,aiNote:null,notes:"E-commerce fashion",   services:["E-Commerce Development","Influencer Marketing"],dealType:"one_time" },
-];
-const SEED_TASKS = [
-  { id:"tk1",title:"Send proposal — Dubai PropCo",   dueDate:ago(-2),priority:"high",  leadId:"l2",projectId:null, assignedTo:"u4",completed:false,type:"proposal" },
-  { id:"tk2",title:"Weekly check-in — TechFlow SEO", dueDate:ago(-1),priority:"medium",leadId:null,projectId:"pr2",assignedTo:"u5",completed:false,type:"meeting" },
-  { id:"tk3",title:"Mobile app wireframe review",    dueDate:ago(-3),priority:"high",  leadId:null,projectId:"pr4",assignedTo:"u6",completed:false,type:"review" },
-  { id:"tk4",title:"Invoice follow-up — Dig. Mktg",  dueDate:ago(0), priority:"high",  leadId:null,projectId:"pr3",assignedTo:"u3",completed:false,type:"email" },
-];
-
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const inits    = (n="")=>n.split(" ").map(w=>w[0]).join("").toUpperCase().slice(0,2);
 const genId    = p=>`${p}${Date.now()}${Math.random().toString(36).slice(2,5)}`;
@@ -130,6 +71,7 @@ const mailLink = (email,subj,body)=>`mailto:${email}?subject=${encodeURIComponen
 const daysOverdue = dueDate => { if(!dueDate)return 0; const diff=new Date()-new Date(dueDate); return Math.floor(diff/86400000); };
 const agingBucket = days => days>=90?"90+":days>=60?"60-90":days>=30?"30-60":"<30";
 const agingColor  = days => days>=90?"text-rose-700 bg-rose-100 border-rose-300":days>=60?"text-rose-600 bg-rose-50 border-rose-200":days>=30?"text-amber-600 bg-amber-50 border-amber-200":"text-slate-600 bg-slate-50 border-slate-200";
+const today = new Date().toISOString().split("T")[0];
 
 const exportCSV = (rows, filename) => {
   if(!rows.length)return;
@@ -138,21 +80,27 @@ const exportCSV = (rows, filename) => {
   const a=document.createElement("a"); a.href="data:text/csv;charset=utf-8,"+encodeURIComponent(csv); a.download=filename+".csv"; a.click();
 };
 
-// Auto-generate recurring payments for current month
-const ensureRecurringPayments = (payments, projects, engagements) => {
-  const ym = today.slice(0,7);
-  const newPays = [...payments];
-  projects.filter(p=>p.recurring&&p.status==="active"&&p.recurringAmount>0).forEach(pr=>{
-    const eng = engagements.find(e=>e.id===pr.engagementId);
-    if(!eng)return;
-    const exists = payments.some(p=>p.projectId===pr.id&&p.recurring&&p.month===ym);
-    if(!exists){
-      const day = String(pr.recurringDay||1).padStart(2,"0");
-      newPays.push({ id:genId("pay"),engagementId:pr.engagementId,projectId:pr.id,clientId:eng.clientId,description:`${pr.name} — ${ym} (Auto)`,amount:pr.recurringAmount,currency:pr.currency||eng.currency||"USD",dueDate:`${ym}-${day}`,paidDate:null,status:"pending",month:ym,recurring:true,autoGenerated:true });
-    }
-  });
-  return newPays;
-};
+// ─── Supabase helpers ─────────────────────────────────────────────────────────
+const dbToUser = r => r ? ({ id:r.id, name:r.name, email:r.email, password:r.password, role:r.role, territories:r.territories||[], commissionRate:r.commission_rate||0, phone:r.phone||"", countryCode:r.country_code||"+65", designation:r.designation||"" }) : null;
+const userToDb = u => ({ id:u.id, name:u.name, email:u.email, password:u.password, role:u.role, territories:u.territories||[], commission_rate:u.commissionRate||0, phone:u.phone||"", country_code:u.countryCode||"+65", designation:u.designation||"" });
+
+const dbToClient = r => r ? ({ id:r.id, name:r.name, contact:r.contact||"", email:r.email||"", phone:r.phone||"", countryCode:r.country_code||"+65", country:r.country||"Singapore" }) : null;
+const clientToDb = c => ({ id:c.id, name:c.name, contact:c.contact||"", email:c.email||"", phone:c.phone||"", country_code:c.countryCode||"+65", country:c.country||"Singapore" });
+
+const dbToEng = r => r ? ({ id:r.id, clientId:r.client_id, name:r.name, salesPersonId:r.sales_person_id||"", pmId:r.pm_id||"", status:r.status||"active", value:r.value||0, currency:r.currency||"SGD", startDate:r.start_date||"", notes:r.notes||"" }) : null;
+const engToDb = e => ({ id:e.id, client_id:e.clientId, name:e.name, sales_person_id:e.salesPersonId||"", pm_id:e.pmId||"", status:e.status||"active", value:Number(e.value)||0, currency:e.currency||"SGD", start_date:e.startDate||"", notes:e.notes||"" });
+
+const dbToProj = r => r ? ({ id:r.id, engagementId:r.engagement_id, name:r.name, assignedTo:r.assigned_to||[], status:r.status||"active", value:r.value||0, currency:r.currency||"SGD", type:r.type||"Development", notes:r.notes||"", recurring:r.recurring||false, recurringDay:r.recurring_day||1, recurringAmount:r.recurring_amount||0 }) : null;
+const projToDb = p => ({ id:p.id, engagement_id:p.engagementId, name:p.name, assigned_to:p.assignedTo||[], status:p.status||"active", value:Number(p.value)||0, currency:p.currency||"SGD", type:p.type||"Development", notes:p.notes||"", recurring:p.recurring||false, recurring_day:p.recurringDay||1, recurring_amount:Number(p.recurringAmount)||0 });
+
+const dbToPayment = r => r ? ({ id:r.id, engagementId:r.engagement_id||"", projectId:r.project_id||"", clientId:r.client_id||"", description:r.description||"", amount:r.amount||0, currency:r.currency||"SGD", dueDate:r.due_date||"", paidDate:r.paid_date||null, status:r.status||"pending", month:r.month||"", recurring:r.recurring||false, autoGenerated:r.auto_generated||false }) : null;
+const paymentToDb = p => ({ id:p.id, engagement_id:p.engagementId||"", project_id:p.projectId||"", client_id:p.clientId||"", description:p.description||"", amount:Number(p.amount)||0, currency:p.currency||"SGD", due_date:p.dueDate||"", paid_date:p.paidDate||null, status:p.status||"pending", month:p.month||"", recurring:p.recurring||false, auto_generated:p.autoGenerated||false });
+
+const dbToLead = r => r ? ({ id:r.id, name:r.name, company:r.company||"", division:r.division||"", email:r.email||"", phone:r.phone||"", countryCode:r.country_code||"+65", country:r.country||"Singapore", status:r.status||"open", value:r.value||0, currency:r.currency||"SGD", salesPersonId:r.sales_person_id||"", source:r.source||"Inbound", notes:r.notes||"", services:r.services||[], dealType:r.deal_type||"one_time", recurringMonthlyValue:r.recurring_monthly_value||0, createdAt:r.created_at||today, aiScore:r.ai_score??null, aiNote:r.ai_note||null }) : null;
+const leadToDb = l => ({ id:l.id, name:l.name, company:l.company||"", division:l.division||"", email:l.email||"", phone:l.phone||"", country_code:l.countryCode||"+65", country:l.country||"Singapore", status:l.status||"open", value:Number(l.value)||0, currency:l.currency||"SGD", sales_person_id:l.salesPersonId||"", source:l.source||"Inbound", notes:l.notes||"", services:l.services||[], deal_type:l.dealType||"one_time", recurring_monthly_value:Number(l.recurringMonthlyValue)||0, created_at:l.createdAt||today, ai_score:l.aiScore??null, ai_note:l.aiNote||null });
+
+const dbToTask = r => r ? ({ id:r.id, title:r.title||"", dueDate:r.due_date||"", priority:r.priority||"medium", leadId:r.lead_id||"", projectId:r.project_id||"", assignedTo:r.assigned_to||"", completed:r.completed||false, type:r.type||"call" }) : null;
+const taskToDb = t => ({ id:t.id, title:t.title||"", due_date:t.dueDate||"", priority:t.priority||"medium", lead_id:t.leadId||"", project_id:t.projectId||"", assigned_to:t.assignedTo||"", completed:t.completed||false, type:t.type||"call" });
 
 // ─── UI Atoms ─────────────────────────────────────────────────────────────────
 const Avatar=({user,size="md"})=>{
@@ -203,7 +151,8 @@ const Modal=({title,onClose,onSave,saveLabel="Save",wide=false,xl=false,noFooter
     </div>
   </div>
 );
-// ─── LOGIN
+
+// ─── AddLeadWizard ────────────────────────────────────────────────────────────
 const AddLeadWizard = ({ nLead, setNL, onClose, onSave, users, isAdmin }) => {
   const [step, setStep] = useState(1);
   const steps = ["Contact Info","Deal Details","Services & Notes"];
@@ -301,10 +250,17 @@ const AddLeadWizard = ({ nLead, setNL, onClose, onSave, users, isAdmin }) => {
     </Modal>
   );
 };
+
 // ─── LOGIN ────────────────────────────────────────────────────────────────────
-const LoginScreen=({onLogin,users,onResetUsers})=>{
-  const [email,setEmail]=useState(""); const [pw,setPw]=useState(""); const [showPw,setShowPw]=useState(false); const [err,setErr]=useState("");
-  const login=()=>{ const u=users.find(u=>u.email.toLowerCase().trim()===email.toLowerCase().trim()&&u.password===pw); if(u)onLogin(u); else setErr("Incorrect email or password."); };
+const LoginScreen=({onLogin})=>{
+  const [email,setEmail]=useState(""); const [pw,setPw]=useState(""); const [showPw,setShowPw]=useState(false); const [err,setErr]=useState(""); const [loading,setLoading]=useState(false);
+  const login=async()=>{
+    setLoading(true); setErr("");
+    const {data,error}=await supabase.from("users").select("*").eq("email",email.toLowerCase().trim()).eq("password",pw).single();
+    setLoading(false);
+    if(error||!data){ setErr("Incorrect email or password."); return; }
+    onLogin(dbToUser(data));
+  };
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
@@ -315,7 +271,7 @@ const LoginScreen=({onLogin,users,onResetUsers})=>{
             <Fld label="Email"><div className="relative"><Mail size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"/><input value={email} onChange={e=>{setEmail(e.target.value);setErr("");}} onKeyDown={e=>e.key==="Enter"&&login()} placeholder="you@nexus.com" className="w-full pl-9 pr-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"/></div></Fld>
             <Fld label="Password"><div className="relative"><Lock size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"/><input type={showPw?"text":"password"} value={pw} onChange={e=>{setPw(e.target.value);setErr("");}} onKeyDown={e=>e.key==="Enter"&&login()} placeholder="••••••••" className="w-full pl-9 pr-10 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"/><button onClick={()=>setShowPw(!showPw)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400">{showPw?<EyeOff size={15}/>:<Eye size={15}/>}</button></div></Fld>
           </div>
-          <button onClick={login} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-xl transition-all active:scale-95 shadow-md">Sign In</button>
+          <button onClick={login} disabled={loading} className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white font-bold py-2.5 rounded-xl transition-all active:scale-95 shadow-md">{loading?"Signing in…":"Sign In"}</button>
           <p className="mt-6 text-center text-xs text-slate-400">Contact your admin for login credentials.</p>
         </div>
       </div>
@@ -328,18 +284,19 @@ const LoginScreen=({onLogin,users,onResetUsers})=>{
 // ═══════════════════════════════════════════════════════════════════════════════
 export default function App() {
   const [currentUser,setCU]=useState(null);
-  const [users,setUsers]=useState(()=>LS.get("ncrm_v4_users",SEED_USERS));
-  const [clients,setClients]=useState(SEED_CLIENTS);
-  const [engagements,setEngagements]=useState(SEED_ENGAGEMENTS);
-  const [projects,setProjects]=useState(SEED_PROJECTS);
-  const [payments,setPayments]=useState(()=>ensureRecurringPayments(SEED_PAYMENTS,SEED_PROJECTS,SEED_ENGAGEMENTS));
-  const [leads,setLeads]=useState(SEED_LEADS);
-  const [tasks,setTasks]=useState(SEED_TASKS);
+  const [users,setUsers]=useState([]);
+  const [clients,setClients]=useState([]);
+  const [engagements,setEngagements]=useState([]);
+  const [projects,setProjects]=useState([]);
+  const [payments,setPayments]=useState([]);
+  const [leads,setLeads]=useState([]);
+  const [tasks,setTasks]=useState([]);
+  const [loading,setLoading]=useState(false);
   const [tab,setTab]=useState("dashboard");
   const [search,setSearch]=useState("");
   const [selEngagement,setSelEng]=useState(null);
   const [selLead,setSelLead]=useState(null);
-  const [expandedClients,setExpandedClients]=useState({cl1:true});
+  const [expandedClients,setExpandedClients]=useState({});
   const [editEng,setEditEng]=useState(null);
   const [editProj,setEditProj]=useState(null);
   const [showAddUser,setShowAddUser]=useState(false);
@@ -358,23 +315,45 @@ export default function App() {
   const EE={clientId:"",name:"",salesPersonId:"",pmId:"",status:"active",value:"",currency:"SGD",startDate:"",notes:""};
   const EP={engagementId:"",name:"",assignedTo:[],status:"active",value:"",currency:"SGD",type:"Development",notes:"",recurring:false,recurringDay:1,recurringAmount:""};
   const EPay={engagementId:"",projectId:"",clientId:"",description:"",amount:"",currency:"SGD",dueDate:"",status:"pending",month:"",recurring:false};
-  const EL={step:1,name:"",company:"",division:"",email:"",phone:"",countryCode:"+65",country:"Singapore",status:"open",value:"",currency:"SGD",salesPersonId:"",source:"Inbound",notes:"",services:[],dealType:"one_time",recurringMonthlyValue:""};
+  const EL={name:"",company:"",division:"",email:"",phone:"",countryCode:"+65",country:"Singapore",status:"open",value:"",currency:"SGD",salesPersonId:"",source:"Inbound",notes:"",services:[],dealType:"one_time",recurringMonthlyValue:""};
   const ET={title:"",dueDate:"",priority:"medium",leadId:"",projectId:"",assignedTo:"",type:"call"};
   const [nUser,setNU]=useState(EU); const [nClient,setNC]=useState(EC); const [nEng,setNE]=useState(EE);
   const [nProj,setNP]=useState(EP); const [nPayment,setNPy]=useState(EPay); const [nLead,setNL]=useState(EL); const [nTask,setNT]=useState(ET);
+
+  // ── Load all data from Supabase on login ──
+  useEffect(()=>{
+    if(!currentUser)return;
+    const load=async()=>{
+      setLoading(true);
+      const [u,cl,en,pr,pa,le,ta]=await Promise.all([
+        supabase.from("users").select("*"),
+        supabase.from("clients").select("*"),
+        supabase.from("engagements").select("*"),
+        supabase.from("projects").select("*"),
+        supabase.from("payments").select("*"),
+        supabase.from("leads").select("*"),
+        supabase.from("tasks").select("*"),
+      ]);
+      if(u.data) setUsers(u.data.map(dbToUser));
+      if(cl.data) setClients(cl.data.map(dbToClient));
+      if(en.data) setEngagements(en.data.map(dbToEng));
+      if(pr.data) setProjects(pr.data.map(dbToProj));
+      if(pa.data) setPayments(pa.data.map(dbToPayment));
+      if(le.data) setLeads(le.data.map(dbToLead));
+      if(ta.data) setTasks(ta.data.map(dbToTask));
+      setLoading(false);
+    };
+    load();
+  },[currentUser]);
 
   const getUser=id=>users.find(u=>u.id===id);
   const getClient=id=>clients.find(c=>c.id===id)||{};
   const getEngagement=id=>engagements.find(e=>e.id===id)||{};
   const getProject=id=>projects.find(p=>p.id===id)||{};
 
-  const updateUsers=fn=>setUsers(prev=>{ const next=typeof fn==="function"?fn(prev):fn; LS.set("ncrm_v4_users",next); return next; });
   const isSA=u=>u?.role==="super_admin"; const isAdmin=u=>u?.role==="admin"||u?.role==="super_admin";
   const canManageEng=u=>u&&["super_admin","admin","engagement"].includes(u.role);
   const canManageProj=(u,proj)=>{ if(!u)return false; if(["super_admin","admin","engagement"].includes(u.role))return true; if(u.role==="projects") return (proj?.assignedTo||[]).includes(u.id)||true; return false; };
-
-  // Auto-refresh recurring payments when projects change
-  useEffect(()=>{ setPayments(prev=>ensureRecurringPayments(prev,projects,engagements)); },[projects,engagements]);
 
   const stats=useMemo(()=>{
     const paid=payments.filter(p=>p.status==="paid");
@@ -398,36 +377,37 @@ export default function App() {
   ].filter(n=>allowedTabs.includes(n.id));
 
   // ── CRUD ──
-  const addUser=()=>{ if(!nUser.name||!nUser.email)return; updateUsers(p=>[...p,{...nUser,id:genId("u"),commissionRate:Number(nUser.commissionRate)||0}]); setNU(EU); setShowAddUser(false); };
-  const saveEditUser=()=>{ if(!editUser)return; updateUsers(p=>p.map(u=>u.id===editUser.id?{...editUser,commissionRate:Number(editUser.commissionRate)||0}:u)); if(currentUser.id===editUser.id)setCU({...editUser,commissionRate:Number(editUser.commissionRate)||0}); setEditUser(null); };
-  const deleteUser=id=>updateUsers(p=>p.filter(u=>u.id!==id));
+  const addUser=async()=>{ if(!nUser.name||!nUser.email)return; const obj={...nUser,id:genId("u"),commissionRate:Number(nUser.commissionRate)||0}; const {error}=await supabase.from("users").insert(userToDb(obj)); if(!error){setUsers(p=>[...p,obj]);setNU(EU);setShowAddUser(false);} };
+  const saveEditUser=async()=>{ if(!editUser)return; const {error}=await supabase.from("users").update(userToDb(editUser)).eq("id",editUser.id); if(!error){setUsers(p=>p.map(u=>u.id===editUser.id?editUser:u)); if(currentUser.id===editUser.id)setCU(editUser); setEditUser(null);} };
+  const deleteUser=async id=>{ await supabase.from("users").delete().eq("id",id); setUsers(p=>p.filter(u=>u.id!==id)); };
 
-  const addClient=()=>{ if(!nClient.name)return; setClients(p=>[...p,{...nClient,id:genId("cl")}]); setNC(EC); setShowAddClient(false); };
+  const addClient=async()=>{ if(!nClient.name)return; const obj={...nClient,id:genId("cl")}; const {error}=await supabase.from("clients").insert(clientToDb(obj)); if(!error){setClients(p=>[...p,obj]);setNC(EC);setShowAddClient(false);} };
 
-  const addEng=()=>{ if(!nEng.name||!nEng.clientId)return; setEngagements(p=>[...p,{...nEng,id:genId("en"),value:Number(nEng.value)||0}]); setNE(EE); setShowAddEng(false); };
-  const saveEng=()=>{ if(!editEng)return; setEngagements(p=>p.map(e=>e.id===editEng.id?{...editEng,value:Number(editEng.value)||0}:e)); if(selEngagement?.id===editEng.id)setSelEng({...editEng}); setEditEng(null); };
-  const deleteEng=id=>{ setEngagements(p=>p.filter(e=>e.id!==id)); if(selEngagement?.id===id)setSelEng(null); };
+  const addEng=async()=>{ if(!nEng.name||!nEng.clientId)return; const obj={...nEng,id:genId("en"),value:Number(nEng.value)||0}; const {error}=await supabase.from("engagements").insert(engToDb(obj)); if(!error){setEngagements(p=>[...p,obj]);setNE(EE);setShowAddEng(false);} };
+  const saveEng=async()=>{ if(!editEng)return; const {error}=await supabase.from("engagements").update(engToDb(editEng)).eq("id",editEng.id); if(!error){setEngagements(p=>p.map(e=>e.id===editEng.id?editEng:e)); if(selEngagement?.id===editEng.id)setSelEng(editEng); setEditEng(null);} };
+  const deleteEng=async id=>{ await supabase.from("engagements").delete().eq("id",id); setEngagements(p=>p.filter(e=>e.id!==id)); if(selEngagement?.id===id)setSelEng(null); };
 
-  const addProj=()=>{ if(!nProj.name||!nProj.engagementId)return; const p={...nProj,id:genId("pr"),value:Number(nProj.value)||0,recurringAmount:Number(nProj.recurringAmount)||0}; setProjects(prev=>[...prev,p]); setNP(EP); setShowAddProj(false); };
-  const saveProj=()=>{ if(!editProj)return; setProjects(p=>p.map(x=>x.id===editProj.id?{...editProj,value:Number(editProj.value)||0,recurringAmount:Number(editProj.recurringAmount)||0}:x)); setEditProj(null); };
-  const deleteProj=id=>setProjects(p=>p.filter(x=>x.id!==id));
+  const addProj=async()=>{ if(!nProj.name||!nProj.engagementId)return; const obj={...nProj,id:genId("pr"),value:Number(nProj.value)||0,recurringAmount:Number(nProj.recurringAmount)||0}; const {error}=await supabase.from("projects").insert(projToDb(obj)); if(!error){setProjects(p=>[...p,obj]);setNP(EP);setShowAddProj(false);} };
+  const saveProj=async()=>{ if(!editProj)return; const {error}=await supabase.from("projects").update(projToDb(editProj)).eq("id",editProj.id); if(!error){setProjects(p=>p.map(x=>x.id===editProj.id?editProj:x)); setEditProj(null);} };
+  const deleteProj=async id=>{ await supabase.from("projects").delete().eq("id",id); setProjects(p=>p.filter(x=>x.id!==id)); };
 
-  const addPayment=()=>{ if(!nPayment.description||!nPayment.amount)return; setPayments(p=>[...p,{...nPayment,id:genId("pay"),amount:Number(nPayment.amount)||0}]); setNPy(EPay); setShowAddPayment(false); };
-  const markPaid=id=>setPayments(p=>p.map(pay=>pay.id===id?{...pay,status:"paid",paidDate:today}:pay));
-  const markOverdue=id=>setPayments(p=>p.map(pay=>pay.id===id?{...pay,status:"overdue"}:pay));
-  const saveEditPayment=()=>{ if(!editPayment)return; setPayments(p=>p.map(pay=>pay.id===editPayment.id?{...editPayment,amount:Number(editPayment.amount)||0}:pay)); setEditPayment(null); };
+  const addPayment=async()=>{ if(!nPayment.description||!nPayment.amount)return; const obj={...nPayment,id:genId("pay"),amount:Number(nPayment.amount)||0}; const {error}=await supabase.from("payments").insert(paymentToDb(obj)); if(!error){setPayments(p=>[...p,obj]);setNPy(EPay);setShowAddPayment(false);} };
+  const markPaid=async id=>{ await supabase.from("payments").update({status:"paid",paid_date:today}).eq("id",id); setPayments(p=>p.map(pay=>pay.id===id?{...pay,status:"paid",paidDate:today}:pay)); };
+  const markOverdue=async id=>{ await supabase.from("payments").update({status:"overdue"}).eq("id",id); setPayments(p=>p.map(pay=>pay.id===id?{...pay,status:"overdue"}:pay)); };
+  const saveEditPayment=async()=>{ if(!editPayment)return; const {error}=await supabase.from("payments").update(paymentToDb(editPayment)).eq("id",editPayment.id); if(!error){setPayments(p=>p.map(pay=>pay.id===editPayment.id?editPayment:pay)); setEditPayment(null);} };
 
-  const addLead=()=>{ if(!nLead.name||!nLead.company)return; setLeads(p=>[...p,{...nLead,id:genId("l"),value:Number(nLead.value)||0,recurringMonthlyValue:Number(nLead.recurringMonthlyValue)||0,createdAt:today,aiScore:null,aiNote:null}]); setNL(EL); setShowAddLead(false); };
-  const updateLeadStatus=(id,status)=>{ setLeads(p=>p.map(l=>l.id===id?{...l,status}:l)); if(selLead?.id===id)setSelLead(p=>({...p,status})); };
-  const deleteLead=id=>{ setLeads(p=>p.filter(l=>l.id!==id)); if(selLead?.id===id)setSelLead(null); };
-  const scoreLead=async id=>{ const lead=leads.find(l=>l.id===id); if(!lead)return; setLeads(p=>p.map(l=>l.id===id?{...l,aiScore:-1}:l)); try{ const r=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:150,messages:[{role:"user",content:`Score B2B lead 1-100 close probability. JSON only: {"score":number,"note":"one sentence"}\ncompany=${lead.company},value=${lead.value}${lead.currency},dealType=${lead.dealType},services=${(lead.services||[]).join(",")},country=${lead.country},notes="${lead.notes}"`}]})}); const d=await r.json(); const parsed=JSON.parse(d.content[0].text.replace(/```json|```/g,"").trim()); setLeads(p=>p.map(l=>l.id===id?{...l,aiScore:parsed.score,aiNote:parsed.note}:l)); }catch{ setLeads(p=>p.map(l=>l.id===id?{...l,aiScore:null}:l)); } };
+  const addLead=async()=>{ if(!nLead.name||!nLead.company)return; const obj={...nLead,id:genId("l"),value:Number(nLead.value)||0,recurringMonthlyValue:Number(nLead.recurringMonthlyValue)||0,createdAt:today,aiScore:null,aiNote:null}; const {error}=await supabase.from("leads").insert(leadToDb(obj)); if(!error){setLeads(p=>[...p,obj]);setNL(EL);setShowAddLead(false);} };
+  const updateLeadStatus=async(id,status)=>{ await supabase.from("leads").update({status}).eq("id",id); setLeads(p=>p.map(l=>l.id===id?{...l,status}:l)); if(selLead?.id===id)setSelLead(p=>({...p,status})); };
+  const deleteLead=async id=>{ await supabase.from("leads").delete().eq("id",id); setLeads(p=>p.filter(l=>l.id!==id)); if(selLead?.id===id)setSelLead(null); };
+  const scoreLead=async id=>{ const lead=leads.find(l=>l.id===id); if(!lead)return; setLeads(p=>p.map(l=>l.id===id?{...l,aiScore:-1}:l)); try{ const r=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:150,messages:[{role:"user",content:`Score B2B lead 1-100 close probability. JSON only: {"score":number,"note":"one sentence"}\ncompany=${lead.company},value=${lead.value}${lead.currency},dealType=${lead.dealType},services=${(lead.services||[]).join(",")},country=${lead.country},notes="${lead.notes}"`}]})}); const d=await r.json(); const parsed=JSON.parse(d.content[0].text.replace(/```json|```/g,"").trim()); await supabase.from("leads").update({ai_score:parsed.score,ai_note:parsed.note}).eq("id",id); setLeads(p=>p.map(l=>l.id===id?{...l,aiScore:parsed.score,aiNote:parsed.note}:l)); }catch{ setLeads(p=>p.map(l=>l.id===id?{...l,aiScore:null}:l)); } };
   const scoreAll=async()=>{ for(const l of leads.filter(l=>l.aiScore===null))await scoreLead(l.id); };
 
-  const addTask=()=>{ if(!nTask.title)return; setTasks(p=>[...p,{...nTask,id:genId("tk"),completed:false}]); setNT(ET); setShowAddTask(false); };
-  const toggleTask=id=>setTasks(p=>p.map(t=>t.id===id?{...t,completed:!t.completed}:t));
-  const deleteTask=id=>setTasks(p=>p.filter(t=>t.id!==id));
+  const addTask=async()=>{ if(!nTask.title)return; const obj={...nTask,id:genId("tk"),completed:false}; const {error}=await supabase.from("tasks").insert(taskToDb(obj)); if(!error){setTasks(p=>[...p,obj]);setNT(ET);setShowAddTask(false);} };
+  const toggleTask=async id=>{ const t=tasks.find(x=>x.id===id); if(!t)return; await supabase.from("tasks").update({completed:!t.completed}).eq("id",id); setTasks(p=>p.map(x=>x.id===id?{...x,completed:!x.completed}:x)); };
+  const deleteTask=async id=>{ await supabase.from("tasks").delete().eq("id",id); setTasks(p=>p.filter(t=>t.id!==id)); };
 
-  if(!currentUser)return <LoginScreen users={users} onLogin={u=>{setCU(u);setTab("dashboard");}} onResetUsers={()=>{LS.set("ncrm_v4_users",SEED_USERS);setUsers(SEED_USERS);}}/>;
+  if(!currentUser)return <LoginScreen onLogin={u=>{setCU(u);setTab("dashboard");}}/>;
+  if(loading)return <div className="min-h-screen flex items-center justify-center bg-slate-50"><div className="text-center"><div className="h-10 w-10 rounded-full border-4 border-blue-600 border-t-transparent animate-spin mx-auto mb-4"/><p className="text-slate-500 font-medium">Loading your workspace…</p></div></div>;
 
   // ══════════════════════════════════════════════════════════════════════════════
   // DASHBOARD
@@ -467,7 +447,7 @@ export default function App() {
   };
 
   // ══════════════════════════════════════════════════════════════════════════════
-  // LEADS (with Import)
+  // LEADS
   // ══════════════════════════════════════════════════════════════════════════════
   const LeadsView=()=>{
     const [sf,setSf]=useState("all"); const [repF,setRepF]=useState("all"); const [geoF,setGeoF]=useState("all"); const [svcF,setSvcF]=useState("all"); const [typeF,setTypeF]=useState("all");
@@ -513,7 +493,7 @@ export default function App() {
   };
 
   // ══════════════════════════════════════════════════════════════════════════════
-  // ENGAGEMENTS (with edit/delete/filter)
+  // ENGAGEMENTS
   // ══════════════════════════════════════════════════════════════════════════════
   const EngagementsView=()=>{
     const [statusF,setStatusF]=useState("all"); const [clientF,setClientF]=useState("all"); const [repF,setRepF]=useState("all");
@@ -563,7 +543,7 @@ export default function App() {
                         </div>
                       </div>
                     ))}</div>}
-                    <div className="mt-4 pt-4 border-t border-slate-200 flex items-center gap-2"><p className="text-xs text-slate-400 font-medium mr-1">Status:</p>{["active","paused","completed"].map(s=><button key={s} onClick={()=>{ setEngagements(p=>p.map(e=>e.id===eng.id?{...e,status:s}:e)); setSelEng(p=>p?{...p,status:s}:p); }} className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${eng.status===s?`${ENG_STATUS[s].cls} border border-current/20`:"bg-white border border-slate-200 text-slate-500 hover:border-slate-300"}`}>{ENG_STATUS[s].label}</button>)}</div>
+                    <div className="mt-4 pt-4 border-t border-slate-200 flex items-center gap-2"><p className="text-xs text-slate-400 font-medium mr-1">Status:</p>{["active","paused","completed"].map(s=><button key={s} onClick={async()=>{ await supabase.from("engagements").update({status:s}).eq("id",eng.id); setEngagements(p=>p.map(e=>e.id===eng.id?{...e,status:s}:e)); setSelEng(p=>p?{...p,status:s}:p); }} className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${eng.status===s?`${ENG_STATUS[s].cls} border border-current/20`:"bg-white border border-slate-200 text-slate-500 hover:border-slate-300"}`}>{ENG_STATUS[s].label}</button>)}</div>
                   </div>}
                 </div>
               );})}
@@ -576,7 +556,7 @@ export default function App() {
   };
 
   // ══════════════════════════════════════════════════════════════════════════════
-  // INVOICES (aging buckets)
+  // INVOICES
   // ══════════════════════════════════════════════════════════════════════════════
   const InvoicesView=()=>{
     const [buckF,setBuckF]=useState("all"); const [cf,setCf]=useState("all");
@@ -592,10 +572,10 @@ export default function App() {
           <table className="w-full text-left"><thead className="bg-slate-50 text-slate-400 text-xs uppercase tracking-wider font-semibold"><tr><th className="px-6 py-4">Invoice</th><th className="px-6 py-4">Client</th><th className="px-6 py-4">Amount</th><th className="px-6 py-4">Due Date</th><th className="px-6 py-4">Days Overdue</th><th className="px-6 py-4">Status</th><th className="px-6 py-4 text-right">Actions</th></tr></thead>
           <tbody className="divide-y divide-slate-100">
             {filtered.length===0&&<tr><td colSpan="7" className="px-6 py-12 text-center text-slate-400 text-sm">No unpaid invoices match filters.</td></tr>}
-            {filtered.sort((a,b)=>daysOverdue(b.dueDate)-daysOverdue(a.dueDate)).map(p=>{ const days=daysOverdue(p.dueDate); const client=getClient(p.clientId); const eng=getEngagement(p.engagementId); const sp=getUser(eng.salesPersonId); return (
+            {filtered.sort((a,b)=>daysOverdue(b.dueDate)-daysOverdue(a.dueDate)).map(p=>{ const days=daysOverdue(p.dueDate); const client=getClient(p.clientId); return (
               <tr key={p.id} className="hover:bg-slate-50 transition-colors group">
                 <td className="px-6 py-4"><p className="font-medium text-sm text-slate-900 max-w-[200px] truncate">{p.description}</p>{p.autoGenerated&&<span className="text-[9px] text-indigo-500 flex items-center gap-0.5"><RefreshCw size={8}/>Auto-generated</span>}</td>
-                <td className="px-6 py-4"><p className="text-sm text-slate-600">{client.name||"—"}</p><div className="flex items-center gap-1 mt-0.5"><WABtn phone={client.phone} code={client.countryCode} msg={`Hi ${client.contact?.split(" ")[0]}, a friendly reminder about invoice "${p.description}" of ${fmtCurrency(p.amount,p.currency)} due ${p.dueDate}.`}/><MailBtn email={client.email} subj={`Payment Reminder — ${p.description}`} body={`Hi ${client.contact?.split(" ")[0]},\n\nThis is a friendly reminder that the following invoice is outstanding:\n\n• ${p.description}\n• Amount: ${fmtCurrency(p.amount,p.currency)}\n• Due date: ${p.dueDate}\n\nPlease arrange payment at your earliest convenience.\n\nThank you`}/></div></td>
+                <td className="px-6 py-4"><p className="text-sm text-slate-600">{client.name||"—"}</p><div className="flex items-center gap-1 mt-0.5"><WABtn phone={client.phone} code={client.countryCode} msg={`Hi ${client.contact?.split(" ")[0]}, reminder about invoice "${p.description}" of ${fmtCurrency(p.amount,p.currency)} due ${p.dueDate}.`}/><MailBtn email={client.email} subj={`Payment Reminder — ${p.description}`} body={`Hi ${client.contact?.split(" ")[0]},\n\nThis is a friendly reminder that the following invoice is outstanding:\n\n• ${p.description}\n• Amount: ${fmtCurrency(p.amount,p.currency)}\n• Due date: ${p.dueDate}\n\nPlease arrange payment at your earliest convenience.\n\nThank you`}/></div></td>
                 <td className="px-6 py-4 font-bold text-slate-800">{fmtCurrency(p.amount,p.currency)}</td>
                 <td className="px-6 py-4 text-sm text-slate-500">{p.dueDate}</td>
                 <td className="px-6 py-4"><span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${agingColor(days)}`}>{days>0?`${days}d overdue`:"Due soon"}</span></td>
@@ -649,7 +629,7 @@ export default function App() {
   };
 
   // ══════════════════════════════════════════════════════════════════════════════
-  // COMMISSIONS / TASKS / TEAM / PROFILE — compact
+  // COMMISSIONS / TASKS / TEAM / PROFILE
   // ══════════════════════════════════════════════════════════════════════════════
   const CommissionsView=()=>{ const commData=users.filter(u=>u.commissionRate>0).map(u=>{ const paidPays=payments.filter(p=>{ const eng=getEngagement(p.engagementId); return p.status==="paid"&&eng.salesPersonId===u.id; }); const wonLeads=leads.filter(l=>l.salesPersonId===u.id&&l.status==="closed_won"); return { rep:u,paidPays,wonLeads,totalInflow:paidPays.reduce((s,p)=>s+p.amount,0),commission:paidPays.reduce((s,p)=>s+p.amount,0)*u.commissionRate/100 }; }).sort((a,b)=>b.commission-a.commission); const grand=commData.reduce((s,d)=>s+d.commission,0);
     return (<div className="space-y-6"><div className="flex justify-between items-center"><h1 className="text-2xl font-bold">Commissions</h1><div className="bg-indigo-50 border border-indigo-200 rounded-xl px-5 py-2.5 text-center"><p className="text-xs text-indigo-400 font-medium uppercase">Total Owed</p><p className="text-2xl font-bold text-indigo-700">{grand.toLocaleString()}</p></div></div>
@@ -672,7 +652,8 @@ export default function App() {
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">{users.map(u=>{ const myProjs=projects.filter(p=>p.assignedTo.includes(u.id)); const myTasks=tasks.filter(t=>t.assignedTo===u.id&&!t.completed); return (<div key={u.id} className="bg-white rounded-2xl border border-slate-200 p-5"><div className="flex items-center gap-3 mb-3"><Avatar user={u} size="lg"/><div className="flex-1 min-w-0"><p className="font-bold">{u.name}</p><RoleBadge role={u.role}/><p className="text-xs text-slate-400 mt-0.5">{u.designation}</p></div><div className="flex gap-1"><WABtn phone={u.phone} code={u.countryCode} msg={`Hi ${u.name.split(" ")[0]}!`} size="md"/><MailBtn email={u.email} subj="Hello" body={`Hi ${u.name.split(" ")[0]},`} size="md"/></div></div><div className="grid grid-cols-3 gap-2 text-center bg-slate-50 rounded-xl p-3"><div><p className="text-[10px] text-slate-400 uppercase">Projects</p><p className="font-bold">{myProjs.length}</p></div><div><p className="text-[10px] text-slate-400 uppercase">Open Tasks</p><p className="font-bold">{myTasks.length}</p></div><div><p className="text-[10px] text-slate-400 uppercase">Rate</p><p className="font-bold text-indigo-600">{u.commissionRate>0?`${u.commissionRate}%`:"—"}</p></div></div></div>); })}</div>
   </div>);
 
-  const ProfileView=()=>{ const [d,setD]=useState({...currentUser}); const [showPw,setShowPw]=useState(false); const save=()=>{ updateUsers(p=>p.map(u=>u.id===d.id?{...d}:u)); setCU({...d}); };
+  const ProfileView=()=>{ const [d,setD]=useState({...currentUser}); const [showPw,setShowPw]=useState(false);
+    const save=async()=>{ await supabase.from("users").update(userToDb(d)).eq("id",d.id); setUsers(p=>p.map(u=>u.id===d.id?d:u)); setCU(d); };
     return (<div className="max-w-xl space-y-6"><div><h1 className="text-2xl font-bold">My Profile</h1><p className="text-slate-400 text-sm mt-0.5">Update your personal details and password.</p></div>
     <div className="bg-white rounded-2xl border border-slate-200 p-6 space-y-5"><div className="flex items-center gap-4 pb-4 border-b border-slate-100"><Avatar user={d} size="lg"/><div><p className="font-bold">{d.name}</p><RoleBadge role={d.role}/></div></div>
     <div className="grid grid-cols-2 gap-4"><Fld label="Full Name"><input value={d.name} onChange={e=>setD({...d,name:e.target.value})} className={IC}/></Fld><Fld label="Designation"><input value={d.designation||""} onChange={e=>setD({...d,designation:e.target.value})} className={IC}/></Fld></div>
@@ -682,12 +663,7 @@ export default function App() {
     <button onClick={save} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-xl shadow-md">Save Changes</button></div></div>); };
 
   // ══════════════════════════════════════════════════════════════════════════════
-  // ADD LEAD WIZARD (3-step)
-  // ══════════════════════════════════════════════════════════════════════════════
-  // AddLeadWizard moved outside App — see below main export
-
-  // ══════════════════════════════════════════════════════════════════════════════
-  // EXCEL IMPORT
+  // IMPORT MODAL
   // ══════════════════════════════════════════════════════════════════════════════
   const ImportModal=()=>{
     const [rows,setRows]=useState(null); const [importing,setImporting]=useState(false); const [done,setDone]=useState(false); const fileRef=useRef();
@@ -700,33 +676,23 @@ export default function App() {
         const parsed=lines.slice(1).map(line=>{ const vals=line.split(",").map(v=>v.trim().replace(/^"|"$/g,"")); const obj={}; headers.forEach((h,i)=>obj[h]=vals[i]||""); return obj; }).filter(r=>r.Name||r.name||r.Company||r.company);
         setRows(parsed);
       } else {
-        // Load SheetJS
         const script=document.createElement("script"); script.src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"; document.head.appendChild(script);
-        script.onload=()=>{
-          const reader=new FileReader(); reader.onload=e=>{ const wb=window.XLSX.read(e.target.result,{type:"binary"}); const ws=wb.Sheets[wb.SheetNames[0]]; const data=window.XLSX.utils.sheet_to_json(ws); setRows(data); }; reader.readAsBinaryString(file);
-        };
+        script.onload=()=>{ const reader=new FileReader(); reader.onload=e=>{ const wb=window.XLSX.read(e.target.result,{type:"binary"}); const ws=wb.Sheets[wb.SheetNames[0]]; const data=window.XLSX.utils.sheet_to_json(ws); setRows(data); }; reader.readAsBinaryString(file); };
       }
     };
-    const doImport=()=>{ if(!rows)return; setImporting(true);
+    const doImport=async()=>{ if(!rows)return; setImporting(true);
       const mapped=rows.map(r=>({ id:genId("l"), name:r.Name||r.name||r["Contact Name"]||"", company:r.Company||r.company||"", division:r.Division||r.division||"", email:r.Email||r.email||"", phone:r.Phone||r.phone||"", countryCode:r.CountryCode||r["Country Code"]||"+65", country:r.Country||r.country||"Singapore", status:"open", value:Number(r.Value||r.value||r["Deal Value"]||0), currency:r.Currency||r.currency||defaultCurrency(r.Country||r.country||"Singapore"), salesPersonId:users.find(u=>u.name===(r.SalesPerson||r["Sales Person"]||""))?.id||"", source:r.Source||r.source||"Inbound", notes:r.Notes||r.notes||"", services:r.Services?r.Services.split(";").map(s=>s.trim()):[], dealType:r.DealType||r["Deal Type"]||"one_time", recurringMonthlyValue:Number(r.RecurringMonthly||0), createdAt:today, aiScore:null, aiNote:null })).filter(r=>r.name&&r.company);
-      setLeads(p=>[...p,...mapped]); setImporting(false); setDone(true);
+      const {error}=await supabase.from("leads").insert(mapped.map(leadToDb));
+      if(!error){ setLeads(p=>[...p,...mapped]); }
+      setImporting(false); setDone(true);
     };
     return (
       <Modal title="Import Leads from Excel / CSV" onClose={()=>{setShowImport(false);setRows(null);setDone(false);}} onSave={rows&&!done?doImport:()=>setShowImport(false)} saveLabel={done?"Done":rows?"Import "+rows.length+" Leads":"Waiting for file…"} wide>
-        {!done&&<>
-          <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-sm text-blue-800">
-            <p className="font-semibold mb-1">Supported columns (case-insensitive):</p>
-            <p className="text-xs font-mono text-blue-700">Name, Company, Division, Email, Phone, CountryCode, Country, Value, Currency, Source, SalesPerson, Services (semicolon-separated), Notes, DealType, RecurringMonthly</p>
-          </div>
-          <div onClick={()=>fileRef.current?.click()} className="border-2 border-dashed border-slate-300 hover:border-blue-400 rounded-2xl p-10 text-center cursor-pointer transition-colors group">
-            <Upload size={32} className="mx-auto text-slate-300 group-hover:text-blue-400 mb-3 transition-colors"/>
-            <p className="font-semibold text-slate-600 group-hover:text-blue-600">Click to upload Excel (.xlsx) or CSV</p>
-            <p className="text-xs text-slate-400 mt-1">or drag and drop your file here</p>
-            <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={e=>{ if(e.target.files?.[0])parseFile(e.target.files[0]); }}/>
-          </div>
-          {rows&&<div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4"><p className="text-sm font-semibold text-emerald-800">✓ {rows.length} rows detected. Preview (first 3):</p><div className="mt-2 space-y-1">{rows.slice(0,3).map((r,i)=><p key={i} className="text-xs font-mono text-emerald-700 truncate">{JSON.stringify(r).slice(0,120)}…</p>)}</div></div>}
+        {!done&&<><div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-sm text-blue-800"><p className="font-semibold mb-1">Supported columns:</p><p className="text-xs font-mono text-blue-700">Name, Company, Division, Email, Phone, CountryCode, Country, Value, Currency, Source, SalesPerson, Services, Notes, DealType, RecurringMonthly</p></div>
+          <div onClick={()=>fileRef.current?.click()} className="border-2 border-dashed border-slate-300 hover:border-blue-400 rounded-2xl p-10 text-center cursor-pointer transition-colors group"><Upload size={32} className="mx-auto text-slate-300 group-hover:text-blue-400 mb-3 transition-colors"/><p className="font-semibold text-slate-600 group-hover:text-blue-600">Click to upload Excel (.xlsx) or CSV</p><p className="text-xs text-slate-400 mt-1">or drag and drop your file here</p><input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={e=>{ if(e.target.files?.[0])parseFile(e.target.files[0]); }}/></div>
+          {rows&&<div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4"><p className="text-sm font-semibold text-emerald-800">✓ {rows.length} rows detected.</p></div>}
         </>}
-        {done&&<div className="text-center py-8"><div className="h-16 w-16 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-4"><CheckCheck size={32} className="text-emerald-600"/></div><p className="text-xl font-bold text-slate-800">Import Complete!</p><p className="text-slate-500 mt-1">{rows?.length} leads have been added to your CRM.</p></div>}
+        {done&&<div className="text-center py-8"><div className="h-16 w-16 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-4"><CheckCheck size={32} className="text-emerald-600"/></div><p className="text-xl font-bold text-slate-800">Import Complete!</p><p className="text-slate-500 mt-1">{rows?.length} leads added.</p></div>}
       </Modal>
     );
   };
@@ -780,7 +746,6 @@ export default function App() {
       {showAddLead&&<AddLeadWizard nLead={nLead} setNL={setNL} onClose={()=>setShowAddLead(false)} onSave={addLead} users={users} isAdmin={isAdmin}/>}
       {showImport&&<ImportModal/>}
 
-      {/* Add User */}
       {showAddUser&&<Modal title="Add User" onClose={()=>setShowAddUser(false)} onSave={addUser} wide>
         <div className="grid grid-cols-2 gap-4"><Fld label="Full Name"><input value={nUser.name} onChange={e=>setNU({...nUser,name:e.target.value})} className={IC} placeholder="Jane Smith"/></Fld><Fld label="Email"><input value={nUser.email} onChange={e=>setNU({...nUser,email:e.target.value})} className={IC}/></Fld></div>
         <div className="grid grid-cols-2 gap-4"><Fld label="Password"><input value={nUser.password} onChange={e=>setNU({...nUser,password:e.target.value})} className={IC}/></Fld><Fld label="Designation"><input value={nUser.designation} onChange={e=>setNU({...nUser,designation:e.target.value})} className={IC}/></Fld></div>
@@ -788,6 +753,7 @@ export default function App() {
         <Fld label="Phone"><PhoneInput code={nUser.countryCode} phone={nUser.phone} onCode={v=>setNU({...nUser,countryCode:v})} onPhone={v=>setNU({...nUser,phone:v})}/></Fld>
         <Fld label="Territories"><div className="grid grid-cols-2 gap-2 mt-1">{COUNTRIES.map(c=><label key={c} className="flex items-center gap-2 cursor-pointer text-sm"><input type="checkbox" checked={nUser.territories.includes(c)} onChange={ev=>setNU({...nUser,territories:ev.target.checked?[...nUser.territories,c]:nUser.territories.filter(t=>t!==c)})} className="rounded"/>{c}</label>)}</div></Fld>
       </Modal>}
+
       {editUser&&<Modal title="Edit User" onClose={()=>setEditUser(null)} onSave={saveEditUser} saveLabel="Save Changes" wide>
         <div className="grid grid-cols-2 gap-4"><Fld label="Full Name"><input value={editUser.name} onChange={e=>setEditUser({...editUser,name:e.target.value})} className={IC}/></Fld><Fld label="Email"><input value={editUser.email} onChange={e=>setEditUser({...editUser,email:e.target.value})} className={IC}/></Fld></div>
         <div className="grid grid-cols-2 gap-4"><Fld label="Password"><input value={editUser.password} onChange={e=>setEditUser({...editUser,password:e.target.value})} className={IC}/></Fld><Fld label="Designation"><input value={editUser.designation||""} onChange={e=>setEditUser({...editUser,designation:e.target.value})} className={IC}/></Fld></div>
@@ -796,13 +762,13 @@ export default function App() {
         <Fld label="Territories"><div className="grid grid-cols-2 gap-2 mt-1">{COUNTRIES.map(c=><label key={c} className="flex items-center gap-2 cursor-pointer text-sm"><input type="checkbox" checked={(editUser.territories||[]).includes(c)} onChange={ev=>setEditUser({...editUser,territories:ev.target.checked?[...(editUser.territories||[]),c]:(editUser.territories||[]).filter(t=>t!==c)})} className="rounded"/>{c}</label>)}</div></Fld>
       </Modal>}
 
-      {/* Add/Edit Engagement */}
       {showAddEng&&<Modal title="New Engagement" onClose={()=>setShowAddEng(false)} onSave={addEng} wide>
         <div className="grid grid-cols-2 gap-4"><Fld label="Client"><select value={nEng.clientId} onChange={e=>setNE({...nEng,clientId:e.target.value})} className={IC}><option value="">Select…</option>{clients.map(c=><option key={c.id} value={c.id}>{c.name} ({c.country})</option>)}</select></Fld><Fld label="Engagement Name"><input value={nEng.name} onChange={e=>setNE({...nEng,name:e.target.value})} className={IC} placeholder="e.g. Digital Transformation 2024"/></Fld></div>
         <div className="grid grid-cols-2 gap-4"><Fld label="Sales Person"><select value={nEng.salesPersonId} onChange={e=>setNE({...nEng,salesPersonId:e.target.value})} className={IC}><option value="">Select…</option>{users.filter(u=>u.role==="sales"||isAdmin({role:u.role})).map(u=><option key={u.id} value={u.id}>{u.name}</option>)}</select></Fld><Fld label="Project Manager"><select value={nEng.pmId} onChange={e=>setNE({...nEng,pmId:e.target.value})} className={IC}><option value="">Select…</option>{users.map(u=><option key={u.id} value={u.id}>{u.name}</option>)}</select></Fld></div>
         <div className="grid grid-cols-2 gap-4"><Fld label="Total Value"><CurrencyInput value={nEng.value} currency={nEng.currency} onValue={v=>setNE({...nEng,value:v})} onCurrency={v=>setNE({...nEng,currency:v})}/></Fld><Fld label="Start Date"><input type="date" value={nEng.startDate} onChange={e=>setNE({...nEng,startDate:e.target.value})} className={IC}/></Fld></div>
         <Fld label="Notes"><textarea value={nEng.notes} onChange={e=>setNE({...nEng,notes:e.target.value})} className={IC+" h-16 resize-none"}/></Fld>
       </Modal>}
+
       {editEng&&<Modal title="Edit Engagement" onClose={()=>setEditEng(null)} onSave={saveEng} saveLabel="Save Changes" wide>
         <div className="grid grid-cols-2 gap-4"><Fld label="Client"><select value={editEng.clientId} onChange={e=>setEditEng({...editEng,clientId:e.target.value})} className={IC}>{clients.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></Fld><Fld label="Engagement Name"><input value={editEng.name} onChange={e=>setEditEng({...editEng,name:e.target.value})} className={IC}/></Fld></div>
         <div className="grid grid-cols-2 gap-4"><Fld label="Sales Person"><select value={editEng.salesPersonId} onChange={e=>setEditEng({...editEng,salesPersonId:e.target.value})} className={IC}>{users.filter(u=>u.role==="sales"||isAdmin({role:u.role})).map(u=><option key={u.id} value={u.id}>{u.name}</option>)}</select></Fld><Fld label="Project Manager"><select value={editEng.pmId} onChange={e=>setEditEng({...editEng,pmId:e.target.value})} className={IC}>{users.map(u=><option key={u.id} value={u.id}>{u.name}</option>)}</select></Fld></div>
@@ -810,17 +776,14 @@ export default function App() {
         <Fld label="Notes"><textarea value={editEng.notes} onChange={e=>setEditEng({...editEng,notes:e.target.value})} className={IC+" h-16 resize-none"}/></Fld>
       </Modal>}
 
-      {/* Add/Edit Project */}
       {showAddProj&&<Modal title="Add Sub-Project" onClose={()=>setShowAddProj(false)} onSave={addProj} wide>
         <div className="grid grid-cols-2 gap-4"><Fld label="Engagement"><select value={nProj.engagementId} onChange={e=>setNP({...nProj,engagementId:e.target.value})} className={IC}><option value="">Select…</option>{engagements.map(e=><option key={e.id} value={e.id}>{getClient(e.clientId).name} — {e.name}</option>)}</select></Fld><Fld label="Project Name"><input value={nProj.name} onChange={e=>setNP({...nProj,name:e.target.value})} className={IC} placeholder="e.g. Website Redesign"/></Fld></div>
         <div className="grid grid-cols-2 gap-4"><Fld label="Type"><select value={nProj.type} onChange={e=>setNP({...nProj,type:e.target.value})} className={IC}>{PROJECT_TYPES.map(t=><option key={t}>{t}</option>)}</select></Fld><Fld label="Value"><CurrencyInput value={nProj.value} currency={nProj.currency} onValue={v=>setNP({...nProj,value:v})} onCurrency={v=>setNP({...nProj,currency:v})}/></Fld></div>
-        <Fld label="Recurring Monthly Invoice?">
-          <div className="flex items-center gap-3 mt-1"><label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={nProj.recurring} onChange={e=>setNP({...nProj,recurring:e.target.checked})} className="rounded accent-blue-600"/><span className="text-sm text-slate-700">Yes — auto-generate monthly invoice</span></label></div>
-          {nProj.recurring&&<div className="mt-3 grid grid-cols-2 gap-3"><Fld label="Monthly Amount"><CurrencyInput value={nProj.recurringAmount} currency={nProj.currency} onValue={v=>setNP({...nProj,recurringAmount:v})} onCurrency={v=>setNP({...nProj,currency:v})}/></Fld><Fld label="Invoice Day of Month"><input type="number" min="1" max="28" value={nProj.recurringDay} onChange={e=>setNP({...nProj,recurringDay:Number(e.target.value)})} className={IC}/></Fld></div>}
-        </Fld>
+        <Fld label="Recurring Monthly Invoice?"><div className="flex items-center gap-3 mt-1"><label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={nProj.recurring} onChange={e=>setNP({...nProj,recurring:e.target.checked})} className="rounded accent-blue-600"/><span className="text-sm text-slate-700">Yes — auto-generate monthly invoice</span></label></div>{nProj.recurring&&<div className="mt-3 grid grid-cols-2 gap-3"><Fld label="Monthly Amount"><CurrencyInput value={nProj.recurringAmount} currency={nProj.currency} onValue={v=>setNP({...nProj,recurringAmount:v})} onCurrency={v=>setNP({...nProj,currency:v})}/></Fld><Fld label="Invoice Day of Month"><input type="number" min="1" max="28" value={nProj.recurringDay} onChange={e=>setNP({...nProj,recurringDay:Number(e.target.value)})} className={IC}/></Fld></div>}</Fld>
         <Fld label="Assigned Team Members"><div className="grid grid-cols-2 gap-2 mt-1">{users.map(u=><label key={u.id} className="flex items-center gap-2 cursor-pointer text-sm"><input type="checkbox" checked={(nProj.assignedTo||[]).includes(u.id)} onChange={ev=>setNP({...nProj,assignedTo:ev.target.checked?[...(nProj.assignedTo||[]),u.id]:(nProj.assignedTo||[]).filter(i=>i!==u.id)})} className="rounded"/><Avatar user={u} size="sm"/>{u.name}</label>)}</div></Fld>
         <Fld label="Notes"><input value={nProj.notes} onChange={e=>setNP({...nProj,notes:e.target.value})} className={IC}/></Fld>
       </Modal>}
+
       {editProj&&<Modal title="Edit Project" onClose={()=>setEditProj(null)} onSave={saveProj} saveLabel="Save Changes" wide>
         <div className="grid grid-cols-2 gap-4"><Fld label="Project Name"><input value={editProj.name} onChange={e=>setEditProj({...editProj,name:e.target.value})} className={IC}/></Fld><Fld label="Type"><select value={editProj.type} onChange={e=>setEditProj({...editProj,type:e.target.value})} className={IC}>{PROJECT_TYPES.map(t=><option key={t}>{t}</option>)}</select></Fld></div>
         <div className="grid grid-cols-2 gap-4"><Fld label="Value"><CurrencyInput value={editProj.value} currency={editProj.currency||"USD"} onValue={v=>setEditProj({...editProj,value:v})} onCurrency={v=>setEditProj({...editProj,currency:v})}/></Fld><Fld label="Status"><select value={editProj.status} onChange={e=>setEditProj({...editProj,status:e.target.value})} className={IC}>{Object.keys(ENG_STATUS).map(k=><option key={k} value={k}>{ENG_STATUS[k].label}</option>)}</select></Fld></div>
@@ -829,15 +792,13 @@ export default function App() {
         <Fld label="Notes"><input value={editProj.notes||""} onChange={e=>setEditProj({...editProj,notes:e.target.value})} className={IC}/></Fld>
       </Modal>}
 
-      {/* Add Payment */}
       {showAddPayment&&<Modal title="Add Invoice / Payment" onClose={()=>setShowAddPayment(false)} onSave={addPayment} wide>
         <Fld label="Description"><input value={nPayment.description} onChange={e=>setNPy({...nPayment,description:e.target.value})} className={IC} placeholder="e.g. Website Redesign — Phase 1"/></Fld>
         <div className="grid grid-cols-2 gap-4"><Fld label="Client"><select value={nPayment.clientId} onChange={e=>setNPy({...nPayment,clientId:e.target.value})} className={IC}><option value="">Select…</option>{clients.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></Fld><Fld label="Engagement"><select value={nPayment.engagementId} onChange={e=>setNPy({...nPayment,engagementId:e.target.value})} className={IC}><option value="">Select…</option>{engagements.filter(e=>!nPayment.clientId||e.clientId===nPayment.clientId).map(e=><option key={e.id} value={e.id}>{e.name}</option>)}</select></Fld></div>
         <div className="grid grid-cols-2 gap-4"><Fld label="Amount"><CurrencyInput value={nPayment.amount} currency={nPayment.currency} onValue={v=>setNPy({...nPayment,amount:v})} onCurrency={v=>setNPy({...nPayment,currency:v})}/></Fld><Fld label="Due Date"><input type="date" value={nPayment.dueDate} onChange={e=>setNPy({...nPayment,dueDate:e.target.value,month:e.target.value.slice(0,7)})} className={IC}/></Fld></div>
-        <div className="grid grid-cols-2 gap-4"><Fld label="Status"><select value={nPayment.status} onChange={e=>setNPy({...nPayment,status:e.target.value})} className={IC}><option value="pending">Pending</option><option value="paid">Paid</option><option value="overdue">Overdue</option></select></Fld><Fld label="Recurring?"><div className="flex items-center gap-2 mt-2.5"><input type="checkbox" checked={nPayment.recurring} onChange={e=>setNPy({...nPayment,recurring:e.target.checked})} className="rounded accent-blue-600"/><span className="text-sm text-slate-700">This is a recurring monthly invoice</span></div></Fld></div>
+        <div className="grid grid-cols-2 gap-4"><Fld label="Status"><select value={nPayment.status} onChange={e=>setNPy({...nPayment,status:e.target.value})} className={IC}><option value="pending">Pending</option><option value="paid">Paid</option><option value="overdue">Overdue</option></select></Fld><Fld label="Recurring?"><div className="flex items-center gap-2 mt-2.5"><input type="checkbox" checked={nPayment.recurring} onChange={e=>setNPy({...nPayment,recurring:e.target.checked})} className="rounded accent-blue-600"/><span className="text-sm text-slate-700">Recurring monthly invoice</span></div></Fld></div>
       </Modal>}
 
-      {/* Add Task */}
       {showAddTask&&<Modal title="Add Task" onClose={()=>setShowAddTask(false)} onSave={addTask}>
         <Fld label="Title"><input value={nTask.title} onChange={e=>setNT({...nTask,title:e.target.value})} className={IC} placeholder="e.g. Follow-up call…"/></Fld>
         <div className="grid grid-cols-2 gap-4"><Fld label="Due Date"><input type="date" value={nTask.dueDate} onChange={e=>setNT({...nTask,dueDate:e.target.value})} className={IC}/></Fld><Fld label="Priority"><select value={nTask.priority} onChange={e=>setNT({...nTask,priority:e.target.value})} className={IC}><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select></Fld></div>
@@ -845,30 +806,13 @@ export default function App() {
         <div className="grid grid-cols-2 gap-4"><Fld label="Linked Lead"><select value={nTask.leadId} onChange={e=>setNT({...nTask,leadId:e.target.value})} className={IC}><option value="">None</option>{leads.map(l=><option key={l.id} value={l.id}>{l.name} — {l.company}</option>)}</select></Fld><Fld label="Linked Project"><select value={nTask.projectId} onChange={e=>setNT({...nTask,projectId:e.target.value})} className={IC}><option value="">None</option>{projects.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></Fld></div>
       </Modal>}
 
-      {/* Edit Payment */}
       {editPayment&&<Modal title="Edit Payment / Invoice" onClose={()=>setEditPayment(null)} onSave={saveEditPayment} saveLabel="Save Changes" wide>
         <Fld label="Description"><input value={editPayment.description} onChange={e=>setEditPayment({...editPayment,description:e.target.value})} className={IC}/></Fld>
-        <div className="grid grid-cols-2 gap-4">
-          <Fld label="Amount"><CurrencyInput value={editPayment.amount} currency={editPayment.currency||"USD"} onValue={v=>setEditPayment({...editPayment,amount:v})} onCurrency={v=>setEditPayment({...editPayment,currency:v})}/></Fld>
-          <Fld label="Due Date"><input type="date" value={editPayment.dueDate||""} onChange={e=>setEditPayment({...editPayment,dueDate:e.target.value,month:e.target.value.slice(0,7)})} className={IC}/></Fld>
-        </div>
-        <div className="grid grid-cols-2 gap-4">
-          <Fld label="Status">
-            <select value={editPayment.status} onChange={e=>setEditPayment({...editPayment,status:e.target.value})} className={IC}>
-              <option value="pending">Pending</option>
-              <option value="paid">Paid</option>
-              <option value="overdue">Overdue</option>
-            </select>
-          </Fld>
-          <Fld label="Date Payment Received" hint="only if paid">
-            <input type="date" value={editPayment.paidDate||""} onChange={e=>setEditPayment({...editPayment,paidDate:e.target.value})} className={IC}/>
-          </Fld>
-        </div>
+        <div className="grid grid-cols-2 gap-4"><Fld label="Amount"><CurrencyInput value={editPayment.amount} currency={editPayment.currency||"USD"} onValue={v=>setEditPayment({...editPayment,amount:v})} onCurrency={v=>setEditPayment({...editPayment,currency:v})}/></Fld><Fld label="Due Date"><input type="date" value={editPayment.dueDate||""} onChange={e=>setEditPayment({...editPayment,dueDate:e.target.value,month:e.target.value.slice(0,7)})} className={IC}/></Fld></div>
+        <div className="grid grid-cols-2 gap-4"><Fld label="Status"><select value={editPayment.status} onChange={e=>setEditPayment({...editPayment,status:e.target.value})} className={IC}><option value="pending">Pending</option><option value="paid">Paid</option><option value="overdue">Overdue</option></select></Fld><Fld label="Date Payment Received" hint="only if paid"><input type="date" value={editPayment.paidDate||""} onChange={e=>setEditPayment({...editPayment,paidDate:e.target.value})} className={IC}/></Fld></div>
         <Fld label="Month (YYYY-MM)"><input value={editPayment.month||""} onChange={e=>setEditPayment({...editPayment,month:e.target.value})} className={IC} placeholder="2024-03"/></Fld>
-        {editPayment.status!=="paid"&&<div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-700">To reverse a paid status, change Status above to Pending or Overdue and clear the received date.</div>}
       </Modal>}
 
-      {/* Add Client */}
       {showAddClient&&<Modal title="Add Client" onClose={()=>setShowAddClient(false)} onSave={addClient}>
         <div className="grid grid-cols-2 gap-4"><Fld label="Company Name"><input value={nClient.name} onChange={e=>setNC({...nClient,name:e.target.value})} className={IC} placeholder="Acme Corp"/></Fld><Fld label="Contact Person"><input value={nClient.contact} onChange={e=>setNC({...nClient,contact:e.target.value})} className={IC}/></Fld></div>
         <Fld label="Email"><input value={nClient.email} onChange={e=>setNC({...nClient,email:e.target.value})} className={IC}/></Fld>
